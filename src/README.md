@@ -1,13 +1,22 @@
 # This is a solver for puzzles of the game "The Witness"
 
-This solver supports all puzzle elements for grid puzzles.
+Illustrations in this readme are made using https://witnesspuzzles.com/
 
 ## Implemented constraints
 - Broken edges
+- Stones (hexagones)
 
 ## Search features
-### Breadth-first-search
-In order to find the shorter solutions first, we use a non-recursive search strategy where the shortest known partial solutions so far are searched first.
+### Edges stones
+Stones on edges that are perpandicular to the candidate solution path cannot be validated.
+The benchmark for this feature was realised on the following puzzle, which has 518087 solutions:
+![Early stone check benchmark puzzle](images/early_stone_check_bench.png)
+|         | Number of states searched | Time |
+|---------|---------------------------|------|
+| Without | 31811177                  | 7.4s |
+| With    | 15108640                  | 5.5s |
+
+The time value is not very relevant as I have not spent much time optimizing code, what is relevant is that the search feature nearly halves the amount of states that are considered while still finding all the solutions.
 
 ## Planned search features
 
@@ -29,9 +38,6 @@ If the only remaining end vertices are unreachable, then the current candidate s
 End vertices maybe be unreachable for the following reasons:
 - It is located in an enclosed area
 - It is located located behind broken edges
-
-### Edges stones
-Stones on edges that are perpandicular to the candidate solution path cannot be validated.
 
 ## Motivation
 

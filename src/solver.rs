@@ -8,12 +8,12 @@ use crate::puzzle::*;
 pub struct PartialSolution {
     /// Candidate solution path
     path: Vec<Pos>,
-    partial_area_left: HashSet<Pos>,
-    partial_area_right: HashSet<Pos>,
-    /// Completed areas that have already been checked and are correct
-    full_areas: Vec<HashSet<Pos>>,
-    /// Cancels that are not yet taken by partial or full areas
-    cancels_left: u8,
+    // partial_area_left: HashSet<Pos>,
+    // partial_area_right: HashSet<Pos>,
+    // /// Completed areas that have already been checked and are correct
+    // full_areas: Vec<HashSet<Pos>>,
+    // /// Cancels that are not yet taken by partial or full areas
+    // cancels_left: u8,
     /// Number of reachable ends left
     reachable_ends: u8,
 }
@@ -22,10 +22,10 @@ impl PartialSolution {
     pub fn new(start: Pos, cancels: u8, ends: u8) -> Self {
         Self {
             path: vec![start],
-            partial_area_left: HashSet::new(),
-            partial_area_right: HashSet::new(),
-            full_areas: vec![],
-            cancels_left: cancels,
+            // partial_area_left: HashSet::new(),
+            // partial_area_right: HashSet::new(),
+            // full_areas: vec![],
+            // cancels_left: cancels,
             reachable_ends: ends,
         }
     }
@@ -40,7 +40,7 @@ pub struct BFSSolver {
     solutions: Vec<Vec<Pos>>,
 
     // Statistics
-    states_visited: u64,
+    pub states_visited: u64,
 }
 
 impl BFSSolver {
@@ -68,6 +68,10 @@ impl BFSSolver {
 
         // So long as there are states to be visited, keep processing them
         while !self.queue.is_empty() {
+            if self.queue.len() > 5_000_000 {
+                println!("Exiting here for fear of OOM");
+                return self.solutions.clone();
+            }
             let partial_sol = self.queue.pop_front().unwrap();
             self.process_partial_solution(partial_sol);
             self.states_visited += 1;
@@ -96,6 +100,11 @@ impl BFSSolver {
             };
 
             let mut new_sol = sol.clone();
+            new_sol.path.push(next);
+
+            if self.stones_invalid(&new_sol) {
+                continue;
+            }
 
             // Check if we enclosed an area
             if self.puzzle.is_outer(&next) {
@@ -105,9 +114,12 @@ impl BFSSolver {
             // Compute partial areas
 
             if self.puzzle.ends.contains(&next) {
-                let mut solution = sol.path.clone();
-                solution.push(next);
-                self.solutions.push(solution);
+                // With enough work on early pruning, this
+                // call to is_solution could be replaced with much less
+                // expensive functions for final checks only
+                if self.puzzle.is_solution(&new_sol.path) {
+                    self.solutions.push(new_sol.path.clone());
+                }
 
                 if sol.reachable_ends > 0 {
                     new_sol.reachable_ends -= 1;
@@ -116,13 +128,33 @@ impl BFSSolver {
                 }
             }
 
-            new_sol.path.push(next);
             self.queue.push_back(new_sol);
         }
     }
 
     fn validate_area(&self, cells: Vec<Pos>) -> bool {
         todo!()
+    }
+
+    /// Return true if it is impossible for the partial solution
+    /// to result in a correct solution with regards to the stones
+    fn stones_invalid(&self, sol: &PartialSolution) -> bool {
+        // There is a stone on an edge perpandicular to the current path
+        // We only need to check the last one, since previous ones were checked in other iterations
+        for dir in Direction::VARIANTS {
+            // SAFETY: this function is never called with a path of one element, since that is just the start node
+            let pos = sol.path[sol.path.len() - 2];
+            if self
+                .puzzle
+                .edge_stones
+                .contains(&EdgePos::new(pos.x, pos.y, dir))
+                && pos.move_direction(dir) != sol.path[sol.path.len() - 1]
+                && pos.move_direction(dir) != *sol.path.get(sol.path.len() - 3).unwrap_or(&pos)
+            {
+                return true;
+            };
+        }
+        false
     }
 }
 
@@ -211,6 +243,22 @@ mod bfs_tests {
                 Pos { x: 0, y: 1 },
             ],
         ];
+
+        run_test(&puzzle, solutions);
+    }
+
+    #[test]
+    fn test_1x1_stones() {
+        let puzzle = Puzzle {
+            vertex_stones: [Pos::new(1, 0)].into(),
+            edge_stones: [EdgePos::new(0, 0, Direction::Right)].into(),
+            ..Default::default()
+        };
+        let solutions = vec![vec![
+            Pos { x: 0, y: 0 },
+            Pos { x: 1, y: 0 },
+            Pos { x: 1, y: 1 },
+        ]];
 
         run_test(&puzzle, solutions);
     }

@@ -35,6 +35,16 @@ impl Pos {
     pub fn get_neighbours(&self) -> [Pos; 4] {
         todo!()
     }
+    /// Returns the direction to go from self to other, if self and other are adjacent
+    pub fn get_direction_to(&self, other: &Self) -> Option<Direction> {
+        match (other.x.wrapping_sub(self.x), other.y.wrapping_sub(self.y)) {
+            (0, 1) => Some(Direction::Up),
+            (0, 255) => Some(Direction::Down),
+            (1, 0) => Some(Direction::Right),
+            (255, 0) => Some(Direction::Left),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
@@ -186,6 +196,33 @@ impl Puzzle {
     pub fn is_blocked(&self, edge: &EdgePos) -> bool {
         self.blocked_edges.contains(edge)
     }
+
+    /// Check that the proposed solution is valid
+    /// This is quite expensive, and should only be used
+    /// for testing, as a ground truth
+    pub fn is_solution(&self, path: &[Pos]) -> bool {
+        if path.len() < 2 {
+            return false;
+        }
+
+        // Get edges
+        let mut edges = Vec::with_capacity(path.len() - 1);
+        for i in 0..path.len() - 1 {
+            let dir = path[i].get_direction_to(&path[i + 1]);
+
+            if dir.is_none() {
+                return false;
+            }
+
+            edges.push(EdgePos::new(path[i].x, path[i].y, dir.unwrap()))
+        }
+
+        // Check stones
+        let vertex_stone = self.vertex_stones.iter().all(|pos| path.contains(pos));
+        let edge_stone = self.edge_stones.iter().all(|edge| edges.contains(edge));
+
+        vertex_stone && edge_stone
+    }
 }
 
 #[cfg(test)]
@@ -226,5 +263,22 @@ mod tests {
         assert!(puzzle.is_blocked(&DOWN_EDGE));
         assert!(!puzzle.is_blocked(&RIGHT_EDGE));
         assert!(!puzzle.is_blocked(&LEFT_EDGE));
+    }
+
+    #[test]
+    fn test_get_direction() {
+        let pos1 = Pos::new(0, 0);
+        let pos2 = Pos::new(0, 1);
+        let pos3 = Pos::new(1, 0);
+        let pos4 = Pos::new(1, 1);
+
+        assert!(pos1.get_direction_to(&pos2) == Some(Direction::Up));
+        assert!(pos2.get_direction_to(&pos1) == Some(Direction::Down));
+        assert!(pos1.get_direction_to(&pos3) == Some(Direction::Right));
+        assert!(pos3.get_direction_to(&pos1) == Some(Direction::Left));
+        assert!(pos1.get_direction_to(&pos4) == None);
+        assert!(pos4.get_direction_to(&pos1) == None);
+        assert!(pos2.get_direction_to(&pos3) == None);
+        assert!(pos3.get_direction_to(&pos2) == None);
     }
 }
