@@ -11,14 +11,23 @@ Illustrations in this readme are made using https://witnesspuzzles.com/
 
 ## Search features
 The following search features are ordered chronologically from first implemented to last implemented. The times in the performance tables are not meant to be taken at face value, the important value is the number of states searched.
+### Simple end reachability check
+If the path goes in front of all the exits, we may stop searching. The test was done on an empty 5x5 puzzle with the starts and ends in opposite corners, which has 1262816 solutions.
+|         | Number of states searched | Time |
+|---------|---------------------------|------|
+| Without | 31811177                  | 8.3s |
+| With    | 17207595                  | 4.5s |
+
+This feature approximately halves the number of states that need to be checked.
+
 ### Edges stones
 Stones on edges that are perpandicular to the candidate solution path cannot be validated.
 The benchmark for this feature was realised on the following puzzle, which has 518087 solutions:
 ![Early stone check benchmark puzzle](images/early_stone_check_bench.png)
 |         | Number of states searched | Time |
 |---------|---------------------------|------|
-| Without | 31811177                  | 7.4s |
-| With    | 15108640                  | 5.5s |
+| Without | 17207595                  | 4.5s |
+| With    |  8197554                  | 3.2s |
 
 The time value is not very relevant as I have not spent much time optimizing code, what is relevant is that the search feature more than halves the amount of states that are considered while still finding all the solutions.
 

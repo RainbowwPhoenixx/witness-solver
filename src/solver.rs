@@ -121,9 +121,8 @@ impl BFSSolver {
                     self.solutions.push(new_sol.path.clone());
                 }
 
-                if sol.reachable_ends > 0 {
-                    new_sol.reachable_ends -= 1;
-                } else {
+                new_sol.reachable_ends -= 1;
+                if new_sol.reachable_ends == 0 {
                     continue;
                 }
             }
