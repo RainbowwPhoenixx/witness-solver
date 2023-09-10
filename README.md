@@ -1,12 +1,16 @@
 # This is a solver for puzzles of the game "The Witness"
 
+This solver implements many features to detect dud solutions early on and reduce the number of states that need to be searched while still finding all the solutions.
+
 Illustrations in this readme are made using https://witnesspuzzles.com/
 
 ## Implemented constraints
 - Broken edges
 - Stones (hexagones)
+- Squares
 
 ## Search features
+The following search features are ordered chronologically from first implemented to last implemented. The times in the performance tables are not meant to be taken at face value, the important value is the number of states searched.
 ### Edges stones
 Stones on edges that are perpandicular to the candidate solution path cannot be validated.
 The benchmark for this feature was realised on the following puzzle, which has 518087 solutions:
@@ -16,7 +20,7 @@ The benchmark for this feature was realised on the following puzzle, which has 5
 | Without | 31811177                  | 7.4s |
 | With    | 15108640                  | 5.5s |
 
-The time value is not very relevant as I have not spent much time optimizing code, what is relevant is that the search feature nearly halves the amount of states that are considered while still finding all the solutions.
+The time value is not very relevant as I have not spent much time optimizing code, what is relevant is that the search feature more than halves the amount of states that are considered while still finding all the solutions.
 
 ## Planned search features
 

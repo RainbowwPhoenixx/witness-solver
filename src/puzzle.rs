@@ -81,6 +81,11 @@ impl EdgePos {
         }
     }
 
+    /// Return the cells left and right of the edge.
+    pub fn get_neighbouring_cells(&self) -> [Pos; 2] {
+        todo!()
+    }
+
     fn normalize(&self) -> Self {
         let mut res = *self;
         match self.dir {
@@ -116,7 +121,7 @@ pub enum CellType {
     Empty,
     /// Squares may not be in the same area as different colored squares
     Square(u32),
-    /// Start constraint, only 2 elements of that color may be
+    /// Start constraint, exactly 2 elements of that color may be
     /// present in the same area. The wrapped value is used to represent a color
     Star(u32),
     /// Triangle constraint, forces the solution path to be adjacent to this cell
@@ -205,23 +210,76 @@ impl Puzzle {
             return false;
         }
 
+        // Check start and end
+        let start = self.starts.contains(path.first().unwrap());
+        let end = self.ends.contains(path.last().unwrap());
+
         // Get edges
         let mut edges = Vec::with_capacity(path.len() - 1);
-        for i in 0..path.len() - 1 {
-            let dir = path[i].get_direction_to(&path[i + 1]);
+        for window in path.windows(2) {
+            let dir = window[0].get_direction_to(&window[1]);
 
             if dir.is_none() {
                 return false;
             }
 
-            edges.push(EdgePos::new(path[i].x, path[i].y, dir.unwrap()))
+            edges.push(EdgePos::new(window[0].x, window[0].y, dir.unwrap()))
         }
 
         // Check stones
         let vertex_stone = self.vertex_stones.iter().all(|pos| path.contains(pos));
         let edge_stone = self.edge_stones.iter().all(|edge| edges.contains(edge));
 
-        vertex_stone && edge_stone
+        // Compute areas
+        let mut areas: Vec<HashSet<Pos>> = vec![];
+        for x in 0..self.width {
+            for y in 0..self.height {
+                let pos = Pos::new(x, y);
+                if !areas.iter().any(|area| area.contains(&pos)) {
+                    // Floodfill from this cell
+                    let mut area = HashSet::new();
+                    self.floodfill(pos, &edges, &mut area);
+                    areas.push(area);
+                }
+            }
+        }
+        let areas_valid = areas.iter().all(|area| self.is_valid(area));
+
+        start && end && vertex_stone && edge_stone && areas_valid
+    }
+
+    fn is_valid(&self, area: &HashSet<Pos>) -> bool {
+        // Check squares
+        let mut color: Option<u32> = None;
+        for cell in area.iter() {
+            match self.squares.get(cell) {
+                Some(col) if color.get_or_insert(*col) != col => return false,
+                _ => {},
+            }
+        }
+        true
+    }
+
+    fn floodfill(&self, pos: Pos, edges: &Vec<EdgePos>, area: &mut HashSet<Pos>) {
+        // Perf: maybe switch the edge list for Hashset?
+        // Return immediately if cell is outside of the puzzle or
+        // if the cell was already in the area
+        if !self.contains_cell(&pos) || !area.insert(pos) {
+            return;
+        }
+
+        for dir in Direction::VARIANTS {
+            let crossing_edge = match dir {
+                Direction::Up => EdgePos::new(pos.x, pos.y + 1, Direction::Right),
+                Direction::Down => EdgePos::new(pos.x, pos.y, Direction::Right),
+                Direction::Right => EdgePos::new(pos.x + 1, pos.y, Direction::Up),
+                Direction::Left => EdgePos::new(pos.x, pos.y, Direction::Up),
+            };
+
+            if !edges.contains(&crossing_edge) {
+                self.floodfill(pos.move_direction(dir), edges, area);
+            }
+        }
     }
 }
 
@@ -280,5 +338,23 @@ mod tests {
         assert!(pos4.get_direction_to(&pos1) == None);
         assert!(pos2.get_direction_to(&pos3) == None);
         assert!(pos3.get_direction_to(&pos2) == None);
+    }
+
+    #[test]
+    fn test_2x1_squares() {
+        // This puzzle is a 2x1 puzzle with the start in the middle
+        // at the bottom and the exit above it. The left cell contains
+        // a black square, the right one contains a white square
+        let puzzle = Puzzle {
+            width: 2,
+            height: 1,
+            starts: vec![Pos::new(1, 0)],
+            ends: vec![Pos::new(1, 1)],
+            squares: [(Pos::new(0, 0), 0), (Pos::new(1, 0), 1)].into(),
+            ..Default::default()
+        };
+        let path = [Pos::new(1, 0), Pos::new(1, 1)];
+
+        assert!(puzzle.is_solution(&path));
     }
 }
