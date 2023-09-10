@@ -115,23 +115,25 @@ impl PartialEq for EdgePos {
     }
 }
 
+type Color = u8;
+
 #[derive(Clone)]
 pub enum CellType {
     /// Empty cell that has no constaints
     Empty,
     /// Squares may not be in the same area as different colored squares
-    Square(u32),
+    Square(Color),
     /// Start constraint, exactly 2 elements of that color may be
-    /// present in the same area. The wrapped value is used to represent a color
-    Star(u32),
+    /// present in the same area.
+    Star(Color),
     /// Triangle constraint, forces the solution path to be adjacent to this cell
     /// as many times as there are triangles in the cell
     Triangle(u8),
     /// Tetris constraint, represented as a list of coordinates
     /// Maybe swtiched out to a bitmask implementation in the future
-    Tetris(Vec<Pos>),
+    Tetris(Color, Vec<Pos>),
     /// Canceller cancels out one constraint in the same area. If there are two, they may cancel each other.
-    Canceller(u32),
+    Canceller(Color),
 }
 
 #[derive(Clone)]
@@ -149,11 +151,11 @@ pub struct Puzzle {
     // pub symmetry: represented by a transform?
 
     // Constraints
-    pub squares: HashMap<Pos, u32>,
-    pub stars: HashMap<Pos, u32>,
+    pub squares: HashMap<Pos, Color>,
+    pub stars: HashMap<Pos, Color>,
     pub triangles: HashMap<Pos, u8>,
-    pub tetris: HashMap<Pos, Vec<Pos>>,
-    pub cancels: HashMap<Pos, u32>,
+    pub tetris: HashMap<Pos, (Color, Vec<Pos>)>,
+    pub cancels: HashMap<Pos, Color>,
     pub vertex_stones: HashSet<Pos>,
     pub edge_stones: HashSet<EdgePos>,
 }
@@ -231,32 +233,70 @@ impl Puzzle {
         let edge_stone = self.edge_stones.iter().all(|edge| edges.contains(edge));
 
         // Compute areas
-        let mut areas: Vec<HashSet<Pos>> = vec![];
-        for x in 0..self.width {
-            for y in 0..self.height {
-                let pos = Pos::new(x, y);
-                if !areas.iter().any(|area| area.contains(&pos)) {
-                    // Floodfill from this cell
-                    let mut area = HashSet::new();
-                    self.floodfill(pos, &edges, &mut area);
-                    areas.push(area);
+        let areas_valid =
+            if !self.squares.is_empty() || !self.stars.is_empty() || !self.tetris.is_empty() {
+                let mut areas: Vec<HashSet<Pos>> = vec![];
+                for x in 0..self.width {
+                    for y in 0..self.height {
+                        let pos = Pos::new(x, y);
+                        if !areas.iter().any(|area| area.contains(&pos)) {
+                            // Floodfill from this cell
+                            let mut area = HashSet::new();
+                            self.floodfill(pos, &edges, &mut area);
+                            areas.push(area);
+                        }
+                    }
                 }
-            }
-        }
-        let areas_valid = areas.iter().all(|area| self.is_valid(area));
+                // Check areas
+                areas.iter().all(|area| self.is_valid(area))
+            } else {
+                true
+            };
 
         start && end && vertex_stone && edge_stone && areas_valid
     }
 
     fn is_valid(&self, area: &HashSet<Pos>) -> bool {
         // Check squares
-        let mut color: Option<u32> = None;
+        let mut color: Option<Color> = None;
         for cell in area.iter() {
             match self.squares.get(cell) {
                 Some(col) if color.get_or_insert(*col) != col => return false,
-                _ => {},
+                _ => {}
             }
         }
+
+        // Check stars
+        let mut color_counts: HashMap<Color, u8> = HashMap::new();
+        for &star_color in area.iter().filter_map(|pos| self.stars.get(pos)) {
+            *color_counts.entry(star_color).or_insert(0) += 1;
+            if color_counts[&star_color] > 2 {
+                return false;
+            }
+        }
+        // If there is a star in the area, do the other checks, only on the star colors of course
+        if !color_counts.is_empty() {
+            for square_color in area.iter().filter_map(|pos| self.squares.get(pos)) {
+                match color_counts.get(square_color) {
+                    Some(1) => *color_counts.get_mut(square_color).unwrap() = 2,
+                    Some(_) => return false,
+                    None => {}
+                }
+            }
+
+            for canceller_color in area.iter().filter_map(|pos| self.cancels.get(pos)) {
+                match color_counts.get(canceller_color) {
+                    Some(1) => *color_counts.get_mut(canceller_color).unwrap() = 2,
+                    Some(_) => return false,
+                    None => {}
+                }
+            }
+
+            if color_counts.values().any(|&count| count != 2) {
+                return false;
+            }
+        }
+
         true
     }
 
@@ -353,8 +393,40 @@ mod tests {
             squares: [(Pos::new(0, 0), 0), (Pos::new(1, 0), 1)].into(),
             ..Default::default()
         };
-        let path = [Pos::new(1, 0), Pos::new(1, 1)];
+        let solution = [Pos::new(1, 0), Pos::new(1, 1)];
 
-        assert!(puzzle.is_solution(&path));
+        assert!(puzzle.is_solution(&solution));
+    }
+
+    #[test]
+    fn test_2x1_stars() {
+        // This puzzle is a 2x1 puzzle with the start in the middle
+        // at the bottom and the exit above it. Both cells contain a star
+        let puzzle = Puzzle {
+            width: 2,
+            height: 1,
+            starts: vec![Pos::new(1, 0)],
+            ends: vec![Pos::new(1, 1)],
+            stars: [(Pos::new(0, 0), 0), (Pos::new(1, 0), 0)].into(),
+            ..Default::default()
+        };
+        let solutions = [
+            [
+                Pos::new(1, 0),
+                Pos::new(0, 0),
+                Pos::new(0, 1),
+                Pos::new(1, 1),
+            ],
+            [
+                Pos::new(1, 0),
+                Pos::new(2, 0),
+                Pos::new(2, 1),
+                Pos::new(1, 1),
+            ],
+        ];
+
+        for sol in solutions {
+            assert!(puzzle.is_solution(&sol));
+        }
     }
 }

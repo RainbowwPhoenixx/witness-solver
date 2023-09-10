@@ -8,6 +8,7 @@ Illustrations in this readme are made using https://witnesspuzzles.com/
 - Broken edges
 - Stones (hexagones)
 - Squares
+- Stars
 
 ## Search features
 The following search features are ordered chronologically from first implemented to last implemented. The times in the performance tables are not meant to be taken at face value, the important value is the number of states searched.

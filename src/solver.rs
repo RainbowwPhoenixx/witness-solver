@@ -279,4 +279,150 @@ mod bfs_tests {
 
         run_test(&puzzle, solutions);
     }
+
+    #[test]
+    fn test_2x1_stars() {
+        // This puzzle is a 2x1 puzzle with the start in the middle
+        // at the bottom and the exit above it. Both cells contain a star
+        let puzzle = Puzzle {
+            width: 2,
+            height: 1,
+            starts: vec![Pos::new(1, 0)],
+            ends: vec![Pos::new(1, 1)],
+            stars: [(Pos::new(0, 0), 0), (Pos::new(1, 0), 0)].into(),
+            ..Default::default()
+        };
+        let solutions = vec![
+            vec![
+                Pos::new(1, 0),
+                Pos::new(2, 0),
+                Pos::new(2, 1),
+                Pos::new(1, 1),
+            ],
+            vec![
+                Pos::new(1, 0),
+                Pos::new(0, 0),
+                Pos::new(0, 1),
+                Pos::new(1, 1),
+            ],
+        ];
+
+        run_test(&puzzle, solutions);
+    }
+
+    #[test]
+    fn test_broken_star_square() {
+        // This puzzle is an actual puzzle example from the game that
+        // contains broken paths, stars, and squares
+        let puzzle = Puzzle {
+            width: 4,
+            height: 4,
+            starts: vec![Pos::new(0, 0)],
+            ends: vec![Pos::new(4, 4)],
+            blocked_edges: [
+                EdgePos::new(0, 4, Direction::Right),
+                EdgePos::new(3, 3, Direction::Right),
+                EdgePos::new(3, 1, Direction::Up),
+                EdgePos::new(2, 0, Direction::Up),
+            ]
+            .into(),
+            squares: [
+                (Pos::new(0, 0), 0),
+                (Pos::new(1, 0), 0),
+                (Pos::new(2, 2), 0),
+                (Pos::new(1, 1), 1),
+                (Pos::new(2, 3), 1),
+                (Pos::new(3, 3), 1),
+            ]
+            .into(),
+            stars: [(Pos::new(3, 0), 5), (Pos::new(0, 3), 5)].into(),
+            ..Default::default()
+        };
+        let solutions = vec![
+            vec![
+                Pos::new(0, 0),
+                Pos::new(1, 0),
+                Pos::new(2, 0),
+                Pos::new(3, 0),
+                Pos::new(4, 0),
+                Pos::new(4, 1),
+                Pos::new(3, 1),
+                Pos::new(2, 1),
+                Pos::new(1, 1),
+                Pos::new(1, 2),
+                Pos::new(2, 2),
+                Pos::new(3, 2),
+                Pos::new(3, 3),
+                Pos::new(2, 3),
+                Pos::new(2, 4),
+                Pos::new(3, 4),
+                Pos::new(4, 4),
+            ],
+            vec![
+                Pos::new(0, 0),
+                Pos::new(0, 1),
+                Pos::new(0, 2),
+                Pos::new(0, 3),
+                Pos::new(1, 3),
+                Pos::new(2, 3),
+                Pos::new(3, 3),
+                Pos::new(3, 2),
+                Pos::new(2, 2),
+                Pos::new(1, 2),
+                Pos::new(1, 1),
+                Pos::new(2, 1),
+                Pos::new(3, 1),
+                Pos::new(3, 0),
+                Pos::new(4, 0),
+                Pos::new(4, 1),
+                Pos::new(4, 2),
+                Pos::new(4, 3),
+                Pos::new(4, 4),
+            ],
+            vec![
+                Pos::new(0, 0),
+                Pos::new(1, 0),
+                Pos::new(2, 0),
+                Pos::new(3, 0),
+                Pos::new(4, 0),
+                Pos::new(4, 1),
+                Pos::new(4, 2),
+                Pos::new(3, 2),
+                Pos::new(3, 3),
+                Pos::new(2, 3),
+                Pos::new(2, 2),
+                Pos::new(2, 1),
+                Pos::new(1, 1),
+                Pos::new(1, 2),
+                Pos::new(1, 3),
+                Pos::new(1, 4),
+                Pos::new(2, 4),
+                Pos::new(3, 4),
+                Pos::new(4, 4),
+            ],
+            vec![
+                Pos::new(0, 0),
+                Pos::new(1, 0),
+                Pos::new(2, 0),
+                Pos::new(3, 0),
+                Pos::new(4, 0),
+                Pos::new(4, 1),
+                Pos::new(3, 1),
+                Pos::new(2, 1),
+                Pos::new(1, 1),
+                Pos::new(1, 2),
+                Pos::new(2, 2),
+                Pos::new(3, 2),
+                Pos::new(3, 3),
+                Pos::new(2, 3),
+                Pos::new(1, 3),
+                Pos::new(1, 4),
+                Pos::new(2, 4),
+                Pos::new(3, 4),
+                Pos::new(4, 4),
+            ],
+        ];
+
+        run_test(&puzzle, solutions);
+    }
 }
