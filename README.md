@@ -9,6 +9,7 @@ Illustrations in this readme are made using https://witnesspuzzles.com/
 - Stones (hexagones)
 - Squares
 - Stars
+- Triangles
 
 ## Search features
 The following search features are ordered chronologically from first implemented to last implemented. The times in the performance tables are not meant to be taken at face value, the important value is the number of states searched.
@@ -22,9 +23,10 @@ If the path goes in front of all the exits, we may stop searching. The test was 
 This feature approximately halves the number of states that need to be checked.
 
 ### Edges stones
-Stones on edges that are perpandicular to the candidate solution path cannot be validated.
-The benchmark for this feature was realised on the following puzzle, which has 518087 solutions:
+Stones on edges that are perpandicular to the candidate solution path cannot be validated. The benchmark for this feature was done on the following puzzle, which has 518087 solutions:
+
 ![Early stone check benchmark puzzle](images/early_stone_check_bench.png)
+
 |         | Number of states searched | Time |
 |---------|---------------------------|------|
 | Without | 17207595                  | 4.5s |
@@ -41,7 +43,8 @@ Even when an area is not yet fully enclosed, cells satisfying any of the followi
 - Cells that touch other cells that fill the previous conditions, and are unreachable by the solution path (green)
 
 ![Example of the conditions](images/early_area_check.png)
-In this image, all cells containing cells must be part of the same area and therefore can be verified before the area is even enclosed.
+ 
+In this image, all cells containing squares must be part of the same area and therefore can be verified before the area is even enclosed.
 
 ### Closed area checking
 When an area becomes fully enclosed, you can check that it is valid. Before finishing the entire solution

@@ -425,4 +425,54 @@ mod bfs_tests {
 
         run_test(&puzzle, solutions);
     }
+
+    #[test]
+    fn test_triangles() {
+        let puzzle = Puzzle {
+            width: 4,
+            height: 4,
+            starts: vec![Pos::new(0, 0)],
+            ends: vec![Pos::new(4, 4)],
+            triangles: [
+                (Pos::new(0, 3), 3),
+                (Pos::new(1, 3), 1),
+                (Pos::new(2, 2), 2),
+                (Pos::new(3, 2), 2),
+                (Pos::new(3, 1), 3),
+                (Pos::new(2, 0), 1),
+            ]
+            .into(),
+            ..Default::default()
+        };
+
+        let solution = vec![
+            Pos { x: 0, y: 0 },
+            Pos { x: 0, y: 1 },
+            Pos { x: 0, y: 2 },
+            Pos { x: 1, y: 2 },
+            Pos { x: 1, y: 3 },
+            Pos { x: 0, y: 3 },
+            Pos { x: 0, y: 4 },
+            Pos { x: 1, y: 4 },
+            Pos { x: 2, y: 4 },
+            Pos { x: 3, y: 4 },
+            Pos { x: 3, y: 3 },
+            Pos { x: 2, y: 3 },
+            Pos { x: 2, y: 2 },
+            Pos { x: 2, y: 1 },
+            Pos { x: 1, y: 1 },
+            Pos { x: 1, y: 0 },
+            Pos { x: 2, y: 0 },
+            Pos { x: 3, y: 0 },
+            Pos { x: 4, y: 0 },
+            Pos { x: 4, y: 1 },
+            Pos { x: 3, y: 1 },
+            Pos { x: 3, y: 2 },
+            Pos { x: 4, y: 2 },
+            Pos { x: 4, y: 3 },
+            Pos { x: 4, y: 4 },
+        ];
+
+        run_test(&puzzle, vec![solution]);
+    }
 }

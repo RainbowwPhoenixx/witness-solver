@@ -27,9 +27,16 @@ impl Pos {
         }
         res
     }
+    /// Returns the 4 edges that surround the given cell, in this order:
+    /// Up, Down, Right, Left
     #[inline(always)]
     pub fn get_cell_edges(&self) -> [EdgePos; 4] {
-        todo!()
+        [
+            EdgePos::new(self.x, self.y + 1, Direction::Right),
+            EdgePos::new(self.x, self.y, Direction::Right),
+            EdgePos::new(self.x + 1, self.y, Direction::Up),
+            EdgePos::new(self.x, self.y, Direction::Up),
+        ]
     }
     #[inline(always)]
     pub fn get_neighbours(&self) -> [Pos; 4] {
@@ -217,7 +224,7 @@ impl Puzzle {
         let end = self.ends.contains(path.last().unwrap());
 
         // Get edges
-        let mut edges = Vec::with_capacity(path.len() - 1);
+        let mut path_edges = Vec::with_capacity(path.len() - 1);
         for window in path.windows(2) {
             let dir = window[0].get_direction_to(&window[1]);
 
@@ -225,12 +232,29 @@ impl Puzzle {
                 return false;
             }
 
-            edges.push(EdgePos::new(window[0].x, window[0].y, dir.unwrap()))
+            path_edges.push(EdgePos::new(window[0].x, window[0].y, dir.unwrap()))
         }
 
         // Check stones
         let vertex_stone = self.vertex_stones.iter().all(|pos| path.contains(pos));
-        let edge_stone = self.edge_stones.iter().all(|edge| edges.contains(edge));
+        let edge_stone = self
+            .edge_stones
+            .iter()
+            .all(|edge| path_edges.contains(edge));
+
+        // Check triangles
+        let mut triangle = true;
+        for (triangle_pos, count) in self.triangles.iter() {
+            let cell_edges = &triangle_pos.get_cell_edges();
+            let filled_cell_edges: Vec<_> = cell_edges
+                .iter()
+                .filter(|edge| path_edges.contains(&edge))
+                .collect();
+
+            if filled_cell_edges.len() != *count as usize {
+                triangle = false;
+            }
+        }
 
         // Compute areas
         let areas_valid =
@@ -242,7 +266,7 @@ impl Puzzle {
                         if !areas.iter().any(|area| area.contains(&pos)) {
                             // Floodfill from this cell
                             let mut area = HashSet::new();
-                            self.floodfill(pos, &edges, &mut area);
+                            self.floodfill(pos, &path_edges, &mut area);
                             areas.push(area);
                         }
                     }
@@ -253,7 +277,7 @@ impl Puzzle {
                 true
             };
 
-        start && end && vertex_stone && edge_stone && areas_valid
+        start && end && vertex_stone && edge_stone && triangle && areas_valid
     }
 
     fn is_valid(&self, area: &HashSet<Pos>) -> bool {
@@ -428,5 +452,55 @@ mod tests {
         for sol in solutions {
             assert!(puzzle.is_solution(&sol));
         }
+    }
+
+    #[test]
+    fn test_triangles() {
+        let puzzle = Puzzle {
+            width: 4,
+            height: 4,
+            starts: vec![Pos::new(0, 0)],
+            ends: vec![Pos::new(4, 4)],
+            triangles: [
+                (Pos::new(0, 3), 3),
+                (Pos::new(1, 3), 1),
+                (Pos::new(2, 2), 2),
+                (Pos::new(3, 2), 2),
+                (Pos::new(3, 1), 3),
+                (Pos::new(2, 0), 1),
+            ]
+            .into(),
+            ..Default::default()
+        };
+
+        let solution = [
+            Pos { x: 0, y: 0 },
+            Pos { x: 0, y: 1 },
+            Pos { x: 0, y: 2 },
+            Pos { x: 1, y: 2 },
+            Pos { x: 1, y: 3 },
+            Pos { x: 0, y: 3 },
+            Pos { x: 0, y: 4 },
+            Pos { x: 1, y: 4 },
+            Pos { x: 2, y: 4 },
+            Pos { x: 3, y: 4 },
+            Pos { x: 3, y: 3 },
+            Pos { x: 2, y: 3 },
+            Pos { x: 2, y: 2 },
+            Pos { x: 2, y: 1 },
+            Pos { x: 1, y: 1 },
+            Pos { x: 1, y: 0 },
+            Pos { x: 2, y: 0 },
+            Pos { x: 3, y: 0 },
+            Pos { x: 4, y: 0 },
+            Pos { x: 4, y: 1 },
+            Pos { x: 3, y: 1 },
+            Pos { x: 3, y: 2 },
+            Pos { x: 4, y: 2 },
+            Pos { x: 4, y: 3 },
+            Pos { x: 4, y: 4 },
+        ];
+
+        assert!(puzzle.is_solution(&solution));
     }
 }
