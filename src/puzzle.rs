@@ -3,16 +3,39 @@
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
+    ops::{Add, Sub},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Pos {
-    pub x: u8,
-    pub y: u8,
+    pub x: i8,
+    pub y: i8,
+}
+
+impl Add for Pos {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Pos {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
+    }
+}
+
+impl Sub for Pos {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Pos {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+        }
+    }
 }
 
 impl Pos {
-    pub const fn new(x: u8, y: u8) -> Self {
+    pub const fn new(x: i8, y: i8) -> Self {
         Self { x, y }
     }
 
@@ -27,6 +50,7 @@ impl Pos {
         }
         res
     }
+
     /// Returns the 4 edges that surround the given cell, in this order:
     /// Up, Down, Right, Left
     #[inline(always)]
@@ -38,17 +62,19 @@ impl Pos {
             EdgePos::new(self.x, self.y, Direction::Up),
         ]
     }
+
     #[inline(always)]
     pub fn get_neighbours(&self) -> [Pos; 4] {
         todo!()
     }
+
     /// Returns the direction to go from self to other, if self and other are adjacent
     pub fn get_direction_to(&self, other: &Self) -> Option<Direction> {
         match (other.x.wrapping_sub(self.x), other.y.wrapping_sub(self.y)) {
             (0, 1) => Some(Direction::Up),
-            (0, 255) => Some(Direction::Down),
+            (0, -1) => Some(Direction::Down),
             (1, 0) => Some(Direction::Right),
-            (255, 0) => Some(Direction::Left),
+            (-1, 0) => Some(Direction::Left),
             _ => None,
         }
     }
@@ -66,22 +92,14 @@ impl Direction {
     pub const VARIANTS: [Self; 4] = [Self::Up, Self::Down, Self::Right, Self::Left];
 }
 
-#[derive(Eq, Clone, Copy, Debug)]
+#[derive(Eq, Clone, Copy, Debug, Hash)]
 pub struct EdgePos {
     pub pos: Pos,
     pub dir: Direction,
 }
 
-impl Hash for EdgePos {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        let norm = self.normalize();
-        norm.pos.hash(state);
-        norm.dir.hash(state);
-    }
-}
-
 impl EdgePos {
-    pub const fn new(x: u8, y: u8, dir: Direction) -> Self {
+    pub const fn new(x: i8, y: i8, dir: Direction) -> Self {
         Self {
             pos: Pos { x, y },
             dir,
@@ -124,6 +142,13 @@ impl PartialEq for EdgePos {
 
 type Color = u8;
 
+/// Represents a polyonmino
+#[derive(PartialEq, Eq, Clone, Debug, Hash)]
+pub struct Poly {
+    pub rotatable: bool,
+    pub minos: Vec<Pos>,
+}
+
 #[derive(Clone)]
 pub enum CellType {
     /// Empty cell that has no constaints
@@ -138,15 +163,18 @@ pub enum CellType {
     Triangle(u8),
     /// Tetris constraint, represented as a list of coordinates
     /// Maybe swtiched out to a bitmask implementation in the future
-    Tetris(Color, Vec<Pos>),
+    Poly(Poly),
+    /// Tetris constraint, represented as a list of coordinates
+    /// Maybe swtiched out to a bitmask implementation in the future
+    Ylop(Poly),
     /// Canceller cancels out one constraint in the same area. If there are two, they may cancel each other.
     Canceller(Color),
 }
 
 #[derive(Clone)]
 pub struct Puzzle {
-    pub width: u8,
-    pub height: u8,
+    pub width: i8,
+    pub height: i8,
 
     /// List of start vertices of the puzzle
     pub starts: Vec<Pos>,
@@ -161,7 +189,8 @@ pub struct Puzzle {
     pub squares: HashMap<Pos, Color>,
     pub stars: HashMap<Pos, Color>,
     pub triangles: HashMap<Pos, u8>,
-    pub tetris: HashMap<Pos, (Color, Vec<Pos>)>,
+    pub polys: HashMap<Pos, Poly>,
+    pub ylops: HashMap<Pos, Poly>,
     pub cancels: HashMap<Pos, Color>,
     pub vertex_stones: HashSet<Pos>,
     pub edge_stones: HashSet<EdgePos>,
@@ -178,7 +207,8 @@ impl Default for Puzzle {
             squares: Default::default(),
             stars: Default::default(),
             triangles: Default::default(),
-            tetris: Default::default(),
+            polys: Default::default(),
+            ylops: Default::default(),
             cancels: Default::default(),
             vertex_stones: Default::default(),
             edge_stones: Default::default(),
@@ -190,13 +220,13 @@ impl Puzzle {
     /// Check if the vertex is inside the puzzle
     #[inline(always)]
     pub fn contains_vertex(&self, pos: &Pos) -> bool {
-        pos.x <= self.width && pos.y <= self.height
+        pos.x >= 0 && pos.x <= self.width && pos.y >= 0 && pos.y <= self.height
     }
 
     /// Check if the cell is inside the puzzle
     #[inline(always)]
     pub fn contains_cell(&self, pos: &Pos) -> bool {
-        pos.x < self.width && pos.y < self.height
+        pos.x >= 0 && pos.x < self.width && pos.y >= 0 && pos.y < self.height
     }
 
     /// Check if the position is on the puzzle boundary
@@ -246,19 +276,20 @@ impl Puzzle {
         let mut triangle = true;
         for (triangle_pos, count) in self.triangles.iter() {
             let cell_edges = &triangle_pos.get_cell_edges();
-            let filled_cell_edges: Vec<_> = cell_edges
+            let filled_cell_edges_count = cell_edges
                 .iter()
-                .filter(|edge| path_edges.contains(&edge))
-                .collect();
+                .filter(|edge| path_edges.contains(edge))
+                .count();
 
-            if filled_cell_edges.len() != *count as usize {
+            if filled_cell_edges_count != *count as usize {
                 triangle = false;
+                break;
             }
         }
 
         // Compute areas
         let areas_valid =
-            if !self.squares.is_empty() || !self.stars.is_empty() || !self.tetris.is_empty() {
+            if !self.squares.is_empty() || !self.stars.is_empty() || !self.polys.is_empty() {
                 let mut areas: Vec<HashSet<Pos>> = vec![];
                 for x in 0..self.width {
                     for y in 0..self.height {
@@ -321,7 +352,81 @@ impl Puzzle {
             }
         }
 
+        if !self.check_tetris(area) {
+            return false;
+        }
+
         true
+    }
+
+    /// Return true if the area is valid according to the tetris rule
+    /// false otherwise
+    fn check_tetris(&self, area: &HashSet<Pos>) -> bool {
+        let mut polys: HashSet<_> = area.iter().filter_map(|pos| self.polys.get(pos)).collect();
+        let mut ylops: HashSet<_> = area.iter().filter_map(|pos| self.ylops.get(pos)).collect();
+
+        if polys.is_empty() && ylops.is_empty() {
+            return true;
+        }
+
+        let tile_count = polys.iter().fold(0, |acc, poly| acc + poly.minos.len());
+        let elit_count = ylops.iter().fold(0, |acc, ylop| acc + ylop.minos.len());
+
+        // If the tile counts don't even match the area, don't bother doing anything else
+        if tile_count - elit_count != area.len() {
+            return false;
+        }
+
+        let mut covering = HashMap::new();
+        for &pos in area.iter() {
+            covering.insert(pos, 0);
+        }
+
+        self.can_tile(polys, ylops, &covering)
+    }
+
+    /// Try tiling the given polys and ylops in the given area
+    /// This implementation is heavily inspired from jbdarkid's solver
+    /// This is currently implemented using a perly recursive strategy
+    /// TODO: switch to backtracking to improve memory footprint
+    fn can_tile(&self, polys: HashSet<&Poly>, ylops: HashSet<&Poly>, area: &HashMap<Pos, i16>) -> bool {
+        // Insert stop condition(s) here
+        if polys.is_empty() && ylops.is_empty() {
+            return area.values().all(|&cover_count| cover_count == 1);
+        }
+
+        // Find a square that is not covered
+        let square = area
+            .iter()
+            .filter(|(_pos, &value)| value < 1)
+            .next()
+            .unwrap();
+
+        for poly in polys.iter() {
+            // For every mino, attempt to place it at the selected square
+            for center_mino in poly.minos.iter() {
+                // Recurse if mino is fully contained within the area and
+                // only covers squares with 0 or less minos on it
+                if poly.minos.iter().all(|mino| {
+                    match area.get(&(*square.0 + *mino - *center_mino)) {
+                        Some(&cover_count) if cover_count < 1 => true,
+                        _ => false,
+                    }
+                }) {
+                    let mut new_area = area.clone();
+                    for mino in poly.minos.iter() {
+                        new_area.remove(&(*square.0 + *mino - *center_mino));
+                    }
+                    let mut new_polys = polys.clone();
+                    new_polys.remove(poly);
+                    if self.can_tile(new_polys, ylops.clone(), &new_area) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
     }
 
     fn floodfill(&self, pos: Pos, edges: &Vec<EdgePos>, area: &mut HashSet<Pos>) {
