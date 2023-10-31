@@ -29,7 +29,13 @@ fn main() {
         ..Default::default()
     };
 
+    let config = BFSSolverConfig {
+        simple_end_reachability_check: true,
+        edge_stones: true,
+    };
+
     let mut solver = solver::BFSSolver::new(&puzzle);
+    solver.config = config;
     let solutions = solver.solve();
 
     println!(
@@ -37,6 +43,7 @@ fn main() {
         solutions.len(),
         solver.states_visited
     );
+
     if !solutions.is_empty() {
         println!("Shortest solution: {:?}", solutions[0]);
     }

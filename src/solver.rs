@@ -31,6 +31,20 @@ impl PartialSolution {
     }
 }
 
+pub struct BFSSolverConfig {
+    pub simple_end_reachability_check: bool,
+    pub edge_stones: bool,
+}
+
+impl Default for BFSSolverConfig {
+    fn default() -> Self {
+        Self {
+            simple_end_reachability_check: true,
+            edge_stones: true,
+        }
+    }
+}
+
 pub struct BFSSolver {
     /// Initial puzzle
     puzzle: Puzzle,
@@ -41,6 +55,9 @@ pub struct BFSSolver {
 
     // Statistics
     pub states_visited: u64,
+
+    // Config
+    pub config: BFSSolverConfig,
 }
 
 impl BFSSolver {
@@ -50,8 +67,10 @@ impl BFSSolver {
             queue: VecDeque::new(),
             solutions: vec![],
             states_visited: 0,
+            config: Default::default(),
         }
     }
+
     pub fn solve(&mut self) -> Vec<Vec<Pos>> {
         if !self.solutions.is_empty() {
             return self.solutions.clone();
@@ -102,7 +121,7 @@ impl BFSSolver {
             let mut new_sol = sol.clone();
             new_sol.path.push(next);
 
-            if self.stones_invalid(&new_sol) {
+            if self.config.edge_stones && self.stones_invalid(&new_sol) {
                 continue;
             }
 
@@ -122,7 +141,7 @@ impl BFSSolver {
                 }
 
                 new_sol.reachable_ends -= 1;
-                if new_sol.reachable_ends == 0 {
+                if self.config.simple_end_reachability_check && new_sol.reachable_ends == 0 {
                     continue;
                 }
             }
@@ -131,7 +150,7 @@ impl BFSSolver {
         }
     }
 
-    fn validate_area(&self, cells: Vec<Pos>) -> bool {
+    fn area_invalid(&self, cells: Vec<Pos>) -> bool {
         todo!()
     }
 
