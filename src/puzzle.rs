@@ -389,18 +389,19 @@ impl Puzzle {
     /// This implementation is heavily inspired from jbdarkid's solver
     /// This is currently implemented using a perly recursive strategy
     /// TODO: switch to backtracking to improve memory footprint
-    fn can_tile(&self, polys: HashSet<&Poly>, ylops: HashSet<&Poly>, area: &HashMap<Pos, i16>) -> bool {
+    fn can_tile(
+        &self,
+        polys: HashSet<&Poly>,
+        ylops: HashSet<&Poly>,
+        area: &HashMap<Pos, i16>,
+    ) -> bool {
         // Insert stop condition(s) here
         if polys.is_empty() && ylops.is_empty() {
             return area.values().all(|&cover_count| cover_count == 1);
         }
 
         // Find a square that is not covered
-        let square = area
-            .iter()
-            .filter(|(_pos, &value)| value < 1)
-            .next()
-            .unwrap();
+        let square = area.iter().find(|(_pos, &value)| value < 1).unwrap();
 
         for poly in polys.iter() {
             // For every mino, attempt to place it at the selected square
@@ -408,10 +409,7 @@ impl Puzzle {
                 // Recurse if mino is fully contained within the area and
                 // only covers squares with 0 or less minos on it
                 if poly.minos.iter().all(|mino| {
-                    match area.get(&(*square.0 + *mino - *center_mino)) {
-                        Some(&cover_count) if cover_count < 1 => true,
-                        _ => false,
-                    }
+                    matches!(area.get(&(*square.0 + *mino - *center_mino)), Some(&cover_count) if cover_count < 1)
                 }) {
                     let mut new_area = area.clone();
                     for mino in poly.minos.iter() {
