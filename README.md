@@ -10,7 +10,7 @@ Illustrations in this readme are made using https://witnesspuzzles.com/
 - Squares
 - Stars
 - Triangles
-- Polyominoes (no rotation)
+- Polyominoes
 
 ## Search features
 The following search features are ordered chronologically from first implemented to last implemented. The times in the performance tables are not meant to be taken at face value, the important value is the number of states searched.
@@ -68,3 +68,6 @@ I haven't played The Witness, however I have watched many playthroughs and enjoy
 When I was thinking about/researching this project, I started having optimisation ideas that I did not see other solvers implement, so I decided maybe it was worth doing my own.
 
 I also wanted to start a new Rust project, to improve my skill in the language, so this project is also a way for me to experiment with rust tests and documentation, and perhaps benchmarks if the project ever reaches that stage.
+
+## Known bugs
+- When two identical polyominos are part of the same area, the solver will forget one of them if their declaration is identical. As a workaround, it is possible to add 1 to the x coordinates of the descriptions of one of the polys in order to make it different from the other.

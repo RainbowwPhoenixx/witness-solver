@@ -507,25 +507,19 @@ mod bfs_tests {
     }
 
     #[test]
-    fn test_polyomino() {
+    fn test_poly() {
         let puzzle = Puzzle {
             width: 3,
             height: 1,
             starts: vec![Pos::new(0, 0)],
             ends: vec![Pos::new(3, 1)],
-            polys: [
-                (
-                    Pos::new(1, 0),
-                    Poly {
-                        rotatable: false,
-                        minos: [
-                            Pos::new(0, 0),
-                            Pos::new(1, 0),
-                        ]
-                        .into(),
-                    },
-                ),
-            ]
+            polys: [(
+                Pos::new(1, 0),
+                Poly {
+                    rotatable: false,
+                    minos: [Pos::new(0, 0), Pos::new(1, 0)].into(),
+                },
+            )]
             .into(),
             ..Default::default()
         };
@@ -569,7 +563,7 @@ mod bfs_tests {
     }
 
     #[test]
-    fn test_polyominos() {
+    fn test_polys() {
         let puzzle = Puzzle {
             width: 3,
             height: 3,
@@ -593,10 +587,7 @@ mod bfs_tests {
                     Pos::new(2, 1),
                     Poly {
                         rotatable: false,
-                        minos: [
-                            Pos::new(0, 0),
-                        ]
-                        .into(),
+                        minos: [Pos::new(0, 0)].into(),
                     },
                 ),
             ]
@@ -605,5 +596,32 @@ mod bfs_tests {
         };
 
         test_solution_count(&puzzle, 17)
+    }
+
+    #[test]
+    fn test_polys_rotation() {
+        let puzzle = Puzzle {
+            width: 3,
+            height: 3,
+            starts: vec![Pos::new(0, 0)],
+            ends: vec![Pos::new(3, 3)],
+            polys: [(
+                Pos::new(1, 1),
+                Poly {
+                    rotatable: true,
+                    minos: [
+                        Pos::new(0, 0),
+                        Pos::new(1, 0),
+                        Pos::new(0, 1),
+                        Pos::new(-1, 0),
+                    ]
+                    .into(),
+                },
+            )]
+            .into(),
+            ..Default::default()
+        };
+
+        test_solution_count(&puzzle, 12);
     }
 }

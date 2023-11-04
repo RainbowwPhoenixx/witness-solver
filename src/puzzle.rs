@@ -149,6 +149,38 @@ pub struct Poly {
     pub minos: Vec<Pos>,
 }
 
+impl Poly {
+    /// Returns the possible rotations for a polyomino
+    /// depending on if it is rotatable or 
+    /// TODO: precompute, cause this gets called a LOT per piece
+    pub fn get_rotations(&self) -> Vec<Self> {
+        let mut res = vec![self.clone()];
+        let mut current = self.clone();
+
+        if self.rotatable {
+            current.rotate_clockwise();
+            res.push(current.clone());
+            current.rotate_clockwise();
+            res.push(current.clone());
+            current.rotate_clockwise();
+            res.push(current.clone());
+        }
+
+        res
+    }
+
+    fn rotate_clockwise(&mut self) {
+        let center = self.minos[0];
+        for block in &mut self.minos[1..] {
+            let new_pos = Pos {
+                x: center.x - (block.y - center.y),
+                y: center.y + (block.x - center.x),
+            };
+            *block = new_pos;
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum CellType {
     /// Empty cell that has no constaints
@@ -362,8 +394,8 @@ impl Puzzle {
     /// Return true if the area is valid according to the tetris rule
     /// false otherwise
     fn check_tetris(&self, area: &HashSet<Pos>) -> bool {
-        let mut polys: HashSet<_> = area.iter().filter_map(|pos| self.polys.get(pos)).collect();
-        let mut ylops: HashSet<_> = area.iter().filter_map(|pos| self.ylops.get(pos)).collect();
+        let polys: HashSet<_> = area.iter().filter_map(|pos| self.polys.get(pos)).collect();
+        let ylops: HashSet<_> = area.iter().filter_map(|pos| self.ylops.get(pos)).collect();
 
         if polys.is_empty() && ylops.is_empty() {
             return true;
@@ -402,23 +434,27 @@ impl Puzzle {
 
         // Find a square that is not covered
         let square = area.iter().find(|(_pos, &value)| value < 1).unwrap();
-
+        
         for poly in polys.iter() {
             // For every mino, attempt to place it at the selected square
-            for center_mino in poly.minos.iter() {
-                // Recurse if mino is fully contained within the area and
-                // only covers squares with 0 or less minos on it
-                if poly.minos.iter().all(|mino| 
-                    matches!(area.get(&(*square.0 + *mino - *center_mino)), Some(&cover_count) if cover_count < 1)
-                ) {
-                    let mut new_area = area.clone();
-                    for mino in poly.minos.iter() {
-                        new_area.remove(&(*square.0 + *mino - *center_mino));
-                    }
-                    let mut new_polys = polys.clone();
-                    new_polys.remove(poly);
-                    if self.can_tile(new_polys, ylops.clone(), &new_area) {
-                        return true;
+            for rotation in &poly.get_rotations() {
+                // For every rotation state of the poly
+                for center_mino in rotation.minos.iter() {
+                    // Recurse if mino is fully contained within the area and
+                    // only covers squares with 0 or less minos on it
+                    if rotation.minos.iter().all(|mino| 
+                        matches!(area.get(&(*square.0 + *mino - *center_mino)), Some(&cover_count) if cover_count < 1)
+                    ) {
+                        let mut new_area = area.clone();
+                        for mino in rotation.minos.iter() {
+                            // TODO: increase cover count instead
+                            new_area.remove(&(*square.0 + *mino - *center_mino));
+                        }
+                        let mut new_polys = polys.clone();
+                        new_polys.remove(poly);
+                        if self.can_tile(new_polys, ylops.clone(), &new_area) {
+                            return true;
+                        }
                     }
                 }
             }
