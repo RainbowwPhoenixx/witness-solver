@@ -238,7 +238,7 @@ impl Puzzle {
     /// Check if the given edge is broken
     #[inline(always)]
     pub fn is_blocked(&self, edge: &EdgePos) -> bool {
-        self.blocked_edges.contains(edge)
+        self.blocked_edges.contains(&edge.normalize())
     }
 
     /// Check that the proposed solution is valid
@@ -408,9 +408,9 @@ impl Puzzle {
             for center_mino in poly.minos.iter() {
                 // Recurse if mino is fully contained within the area and
                 // only covers squares with 0 or less minos on it
-                if poly.minos.iter().all(|mino| {
+                if poly.minos.iter().all(|mino| 
                     matches!(area.get(&(*square.0 + *mino - *center_mino)), Some(&cover_count) if cover_count < 1)
-                }) {
+                ) {
                     let mut new_area = area.clone();
                     for mino in poly.minos.iter() {
                         new_area.remove(&(*square.0 + *mino - *center_mino));

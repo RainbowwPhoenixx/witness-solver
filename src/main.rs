@@ -1,4 +1,4 @@
-use crate::puzzle::*;
+use crate::{puzzle::*, solver::BFSSolverConfig};
 
 mod puzzle;
 mod solver;
