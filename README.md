@@ -10,7 +10,7 @@ Illustrations in this readme are made using https://witnesspuzzles.com/
 - Squares
 - Stars
 - Triangles
-- Polyominoes
+- Polyominoes (no rotation)
 
 ## Search features
 The following search features are ordered chronologically from first implemented to last implemented. The times in the performance tables are not meant to be taken at face value, the important value is the number of states searched.
@@ -56,6 +56,10 @@ If the only remaining end vertices are unreachable, then the current candidate s
 End vertices maybe be unreachable for the following reasons:
 - It is located in an enclosed area
 - It is located located behind broken edges
+
+### Tetris tiling optimisations
+Before running a complete expensive we can check that the number of tetris blocks - number of neg tetris blocks = total cells in an area
+During the actual tiling attempts, we can immediately throw out some of the combinations with some parity checks (thanks pcf)
 
 ## Motivation
 

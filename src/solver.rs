@@ -190,11 +190,22 @@ mod bfs_tests {
     use crate::puzzle::*;
     use std::collections::{HashMap, HashSet};
 
-    fn run_test(puzzle: &Puzzle, expected_solutions: Vec<Vec<Pos>>) {
+    fn test_solutions(puzzle: &Puzzle, expected_solutions: Vec<Vec<Pos>>) {
         let mut solver = BFSSolver::new(puzzle);
         let solutions = solver.solve();
 
+        println!("Expected: {:?}\nGot: {:?}", expected_solutions, solutions);
+
         assert!(solutions == expected_solutions)
+    }
+
+    fn test_solution_count(puzzle: &Puzzle, expected_count: usize) {
+        let mut solver = BFSSolver::new(puzzle);
+        let solutions = solver.solve();
+
+        println!("Expected: {:?}\nGot: {:?}", expected_count, solutions.len());
+
+        assert!(solutions.len() == expected_count)
     }
 
     #[test]
@@ -205,7 +216,7 @@ mod bfs_tests {
             vec![Pos { x: 0, y: 0 }, Pos { x: 1, y: 0 }, Pos { x: 1, y: 1 }],
         ];
 
-        run_test(&puzzle, solutions);
+        test_solutions(&puzzle, solutions);
     }
 
     #[test]
@@ -220,7 +231,7 @@ mod bfs_tests {
             Pos { x: 1, y: 1 },
         ]];
 
-        run_test(&puzzle, solutions);
+        test_solutions(&puzzle, solutions);
     }
 
     #[test]
@@ -241,7 +252,7 @@ mod bfs_tests {
             ],
         ];
 
-        run_test(&puzzle, solutions);
+        test_solutions(&puzzle, solutions);
     }
 
     #[test]
@@ -262,7 +273,7 @@ mod bfs_tests {
             ],
         ];
 
-        run_test(&puzzle, solutions);
+        test_solutions(&puzzle, solutions);
     }
 
     #[test]
@@ -278,7 +289,7 @@ mod bfs_tests {
             Pos { x: 1, y: 1 },
         ]];
 
-        run_test(&puzzle, solutions);
+        test_solutions(&puzzle, solutions);
     }
 
     #[test]
@@ -296,7 +307,7 @@ mod bfs_tests {
         };
         let solutions = vec![vec![Pos { x: 1, y: 0 }, Pos { x: 1, y: 1 }]];
 
-        run_test(&puzzle, solutions);
+        test_solutions(&puzzle, solutions);
     }
 
     #[test]
@@ -326,7 +337,7 @@ mod bfs_tests {
             ],
         ];
 
-        run_test(&puzzle, solutions);
+        test_solutions(&puzzle, solutions);
     }
 
     #[test]
@@ -442,7 +453,7 @@ mod bfs_tests {
             ],
         ];
 
-        run_test(&puzzle, solutions);
+        test_solutions(&puzzle, solutions);
     }
 
     #[test]
@@ -492,6 +503,107 @@ mod bfs_tests {
             Pos { x: 4, y: 4 },
         ];
 
-        run_test(&puzzle, vec![solution]);
+        test_solutions(&puzzle, vec![solution]);
+    }
+
+    #[test]
+    fn test_polyomino() {
+        let puzzle = Puzzle {
+            width: 3,
+            height: 1,
+            starts: vec![Pos::new(0, 0)],
+            ends: vec![Pos::new(3, 1)],
+            polys: [
+                (
+                    Pos::new(1, 0),
+                    Poly {
+                        rotatable: false,
+                        minos: [
+                            Pos::new(0, 0),
+                            Pos::new(1, 0),
+                        ]
+                        .into(),
+                    },
+                ),
+            ]
+            .into(),
+            ..Default::default()
+        };
+
+        let solutions = vec![
+            vec![
+                Pos::new(0, 0),
+                Pos::new(1, 0),
+                Pos::new(1, 1),
+                Pos::new(2, 1),
+                Pos::new(3, 1),
+            ],
+            vec![
+                Pos::new(0, 0),
+                Pos::new(1, 0),
+                Pos::new(2, 0),
+                Pos::new(2, 1),
+                Pos::new(3, 1),
+            ],
+            vec![
+                Pos::new(0, 0),
+                Pos::new(0, 1),
+                Pos::new(1, 1),
+                Pos::new(1, 0),
+                Pos::new(2, 0),
+                Pos::new(3, 0),
+                Pos::new(3, 1),
+            ],
+            vec![
+                Pos::new(0, 0),
+                Pos::new(0, 1),
+                Pos::new(1, 1),
+                Pos::new(2, 1),
+                Pos::new(2, 0),
+                Pos::new(3, 0),
+                Pos::new(3, 1),
+            ],
+        ];
+
+        test_solutions(&puzzle, solutions)
+    }
+
+    #[test]
+    fn test_polyominos() {
+        let puzzle = Puzzle {
+            width: 3,
+            height: 3,
+            starts: vec![Pos::new(0, 0)],
+            ends: vec![Pos::new(3, 3)],
+            polys: [
+                (
+                    Pos::new(1, 1),
+                    Poly {
+                        rotatable: false,
+                        minos: [
+                            Pos::new(0, 0),
+                            Pos::new(1, 0),
+                            Pos::new(0, 1),
+                            Pos::new(1, 1),
+                        ]
+                        .into(),
+                    },
+                ),
+                (
+                    Pos::new(2, 1),
+                    Poly {
+                        rotatable: false,
+                        minos: [
+                            Pos::new(0, 0),
+                        ]
+                        .into(),
+                    },
+                ),
+            ]
+            .into(),
+            ..Default::default()
+        };
+
+        test_solution_count(&puzzle, 17)
     }
 }
