@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{puzzle::*, solver::BFSSolverConfig};
 
 mod puzzle;
@@ -36,15 +38,20 @@ fn main() {
 
     let mut solver = solver::BFSSolver::new(&puzzle);
     solver.config = config;
+
+    let before = Instant::now();
     let solutions = solver.solve();
+    let solve_time = before.elapsed();
 
     println!(
-        "Found {} solutions, visited {} states",
+        "Found {} solutions and visited {} states in {:?}",
         solutions.len(),
-        solver.states_visited
+        solver.states_visited,
+        solve_time,
     );
 
     if !solutions.is_empty() {
-        println!("Shortest solution: {:?}", solutions[0]);
+        print!("Shortest solution: ");
+        print_solution(&solutions[0]);
     }
 }

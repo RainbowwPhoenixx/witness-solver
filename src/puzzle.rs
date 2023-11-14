@@ -2,6 +2,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Display,
     hash::Hash,
     ops::{Add, Sub},
 };
@@ -10,6 +11,12 @@ use std::{
 pub struct Pos {
     pub x: i8,
     pub y: i8,
+}
+
+impl Display for Pos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
 }
 
 impl Add for Pos {
@@ -92,6 +99,21 @@ impl Direction {
     pub const VARIANTS: [Self; 4] = [Self::Up, Self::Down, Self::Right, Self::Left];
 }
 
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Direction::Up => "U",
+                Direction::Down => "D",
+                Direction::Right => "R",
+                Direction::Left => "L",
+            }
+        )
+    }
+}
+
 #[derive(Eq, Clone, Copy, Debug, Hash)]
 pub struct EdgePos {
     pub pos: Pos,
@@ -151,7 +173,7 @@ pub struct Poly {
 
 impl Poly {
     /// Returns the possible rotations for a polyomino
-    /// depending on if it is rotatable or 
+    /// depending on if it is rotatable or
     /// TODO: precompute, cause this gets called a LOT per piece
     pub fn get_rotations(&self) -> Vec<Self> {
         let mut res = vec![self.clone()];
@@ -421,12 +443,7 @@ impl Puzzle {
     /// This implementation is heavily inspired from jbdarkid's solver
     /// This is currently implemented using a perly recursive strategy
     /// TODO: switch to backtracking to improve memory footprint
-    fn can_tile(
-        &self,
-        polys: Vec<&Poly>,
-        ylops: Vec<&Poly>,
-        area: &HashMap<Pos, i16>,
-    ) -> bool {
+    fn can_tile(&self, polys: Vec<&Poly>, ylops: Vec<&Poly>, area: &HashMap<Pos, i16>) -> bool {
         // Insert stop condition(s) here
         if polys.is_empty() && ylops.is_empty() {
             return area.values().all(|&cover_count| cover_count == 1);
@@ -434,7 +451,7 @@ impl Puzzle {
 
         // Find a square that is not covered
         let square = area.iter().find(|(_pos, &value)| value < 1).unwrap();
-        
+
         for (poly_idx, poly) in polys.iter().enumerate() {
             // For every mino, attempt to place it at the selected square
             for rotation in &poly.get_rotations() {
@@ -442,7 +459,7 @@ impl Puzzle {
                 for center_mino in rotation.minos.iter() {
                     // Recurse if mino is fully contained within the area and
                     // only covers squares with 0 or less minos on it
-                    if rotation.minos.iter().all(|mino| 
+                    if rotation.minos.iter().all(|mino|
                         matches!(area.get(&(*square.0 + *mino - *center_mino)), Some(&cover_count) if cover_count < 1)
                     ) {
                         let mut new_area = area.clone();
@@ -484,6 +501,21 @@ impl Puzzle {
             }
         }
     }
+}
+
+pub fn print_solution(sol: &[Pos]) {
+    if sol.len() == 0 {return;}
+
+    print!("{} ", sol[0]);
+
+    for win in sol.windows(2) {
+        let prev = win[0];
+        let next = win[1];
+
+        print!("{}", prev.get_direction_to(&next).unwrap());
+    }
+
+    println!()
 }
 
 #[cfg(test)]
