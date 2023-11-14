@@ -34,6 +34,7 @@ impl PartialSolution {
 pub struct BFSSolverConfig {
     pub simple_end_reachability_check: bool,
     pub edge_stones: bool,
+    pub max_solutions: u32, // if 0, get all solutions
 }
 
 impl Default for BFSSolverConfig {
@@ -41,6 +42,7 @@ impl Default for BFSSolverConfig {
         Self {
             simple_end_reachability_check: true,
             edge_stones: true,
+            max_solutions: 0,
         }
     }
 }
@@ -94,6 +96,12 @@ impl BFSSolver {
             let partial_sol = self.queue.pop_front().unwrap();
             self.process_partial_solution(partial_sol);
             self.states_visited += 1;
+
+            if self.config.max_solutions > 0
+                && self.solutions.len() >= self.config.max_solutions as usize
+            {
+                return self.solutions.clone();
+            }
         }
 
         self.solutions.clone()

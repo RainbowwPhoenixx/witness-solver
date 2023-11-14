@@ -34,6 +34,8 @@ fn main() {
     let config = BFSSolverConfig {
         simple_end_reachability_check: true,
         edge_stones: true,
+        max_solutions: 1,
+        ..Default::default()
     };
 
     let mut solver = solver::BFSSolver::new(&puzzle);
