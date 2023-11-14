@@ -599,7 +599,7 @@ mod bfs_tests {
     }
 
     #[test]
-    fn test_polys_rotation() {
+    fn test_poly_rotation() {
         let puzzle = Puzzle {
             width: 3,
             height: 3,

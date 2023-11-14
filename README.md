@@ -70,4 +70,4 @@ When I was thinking about/researching this project, I started having optimisatio
 I also wanted to start a new Rust project, to improve my skill in the language, so this project is also a way for me to experiment with rust tests and documentation, and perhaps benchmarks if the project ever reaches that stage.
 
 ## Known bugs
-- When two identical polyominos are part of the same area, the solver will forget one of them if their declaration is identical. As a workaround, it is possible to add 1 to the x coordinates of the descriptions of one of the polys in order to make it different from the other.
+None

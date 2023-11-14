@@ -394,8 +394,8 @@ impl Puzzle {
     /// Return true if the area is valid according to the tetris rule
     /// false otherwise
     fn check_tetris(&self, area: &HashSet<Pos>) -> bool {
-        let polys: HashSet<_> = area.iter().filter_map(|pos| self.polys.get(pos)).collect();
-        let ylops: HashSet<_> = area.iter().filter_map(|pos| self.ylops.get(pos)).collect();
+        let polys: Vec<_> = area.iter().filter_map(|pos| self.polys.get(pos)).collect();
+        let ylops: Vec<_> = area.iter().filter_map(|pos| self.ylops.get(pos)).collect();
 
         if polys.is_empty() && ylops.is_empty() {
             return true;
@@ -423,8 +423,8 @@ impl Puzzle {
     /// TODO: switch to backtracking to improve memory footprint
     fn can_tile(
         &self,
-        polys: HashSet<&Poly>,
-        ylops: HashSet<&Poly>,
+        polys: Vec<&Poly>,
+        ylops: Vec<&Poly>,
         area: &HashMap<Pos, i16>,
     ) -> bool {
         // Insert stop condition(s) here
@@ -435,7 +435,7 @@ impl Puzzle {
         // Find a square that is not covered
         let square = area.iter().find(|(_pos, &value)| value < 1).unwrap();
         
-        for poly in polys.iter() {
+        for (poly_idx, poly) in polys.iter().enumerate() {
             // For every mino, attempt to place it at the selected square
             for rotation in &poly.get_rotations() {
                 // For every rotation state of the poly
@@ -451,7 +451,7 @@ impl Puzzle {
                             new_area.remove(&(*square.0 + *mino - *center_mino));
                         }
                         let mut new_polys = polys.clone();
-                        new_polys.remove(poly);
+                        new_polys.swap_remove(poly_idx);
                         if self.can_tile(new_polys, ylops.clone(), &new_area) {
                             return true;
                         }
