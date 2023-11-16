@@ -53,7 +53,13 @@ fn main() {
     );
 
     if !solutions.is_empty() {
-        print!("Shortest solution: ");
+        print!("Shortest solution ({} moves): ", solutions[0].len() - 1);
         print_solution(&solutions[0]);
+    }
+
+    if solutions.len() < 10 {
+        for solution in solutions {
+            print_solution(&solution);
+        }
     }
 }

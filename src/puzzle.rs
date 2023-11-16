@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use json;
+
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -162,13 +164,30 @@ impl PartialEq for EdgePos {
     }
 }
 
-type Color = u8;
+pub type Color = u8;
 
 /// Represents a polyonmino
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub struct Poly {
     pub rotatable: bool,
     pub minos: Vec<Pos>,
+}
+
+impl From<u32> for Poly {
+    fn from(value: u32) -> Self {
+        let rotatable = (value & 1 << 20) != 0;
+        let mut minos = vec![];
+
+        for x in 0..4 {
+            for y in 0..4 {
+                if (value & (1 << (x * 4 + 3 - y))) != 0 {
+                    minos.push(Pos::new(x as i8, y as i8))
+                }
+            }
+        }
+
+        Self { rotatable, minos }
+    }
 }
 
 impl Poly {
@@ -501,10 +520,160 @@ impl Puzzle {
             }
         }
     }
+
+    /// Creates a Puzzle from jbdarkid's json format
+    /// TODO: Implement ends/starts on edges. They are equivalent
+    /// to two end/start on each end of the edge, and a blocked
+    /// edge separating them
+    pub fn from_json(src: &str) -> Result<Self, String> {
+        let data = json::parse(src).unwrap();
+
+        let width = data["width"]
+            .as_usize()
+            .ok_or("Failed to decode puzzle width")?
+            / 2;
+        let height = data["height"]
+            .as_usize()
+            .ok_or("Failed to decode puzzle height")?
+            / 2;
+
+        let mut puzzle = Puzzle {
+            width: width as i8,
+            height: height as i8,
+            starts: vec![],
+            ends: vec![],
+            ..Default::default()
+        };
+
+        // To read the grid, we need to do some coordinate manipulations
+        // because of the format
+
+        // Process corners (starts, ends, stones)
+        for x in 0..=width {
+            for y in 0..=height {
+                let cell = &data["grid"][x * 2][(height - y) * 2];
+                if cell["start"] == true {
+                    puzzle.starts.push(Pos::new(x as i8, y as i8));
+                }
+
+                if cell["end"].is_string() {
+                    puzzle.ends.push(Pos::new(x as i8, y as i8));
+                }
+
+                if cell["dot"].is_number() {
+                    puzzle.vertex_stones.insert(Pos::new(x as i8, y as i8));
+                }
+            }
+        }
+
+        // Process edges (stone, broken edge)
+        for x in 0..=width {
+            for y in 0..=height {
+                let up = &data["grid"][x * 2][(height - y) * 2 - 1];
+                let right = &data["grid"][x * 2 + 1][(height - y) * 2];
+
+                if up["dot"].is_number() {
+                    puzzle
+                        .edge_stones
+                        .insert(EdgePos::new(x as i8, y as i8, Direction::Up));
+                }
+                if right["dot"].is_number() {
+                    puzzle
+                        .edge_stones
+                        .insert(EdgePos::new(x as i8, y as i8, Direction::Right));
+                }
+                if up["gap"].is_number() {
+                    puzzle
+                        .blocked_edges
+                        .insert(EdgePos::new(x as i8, y as i8, Direction::Up));
+                }
+                if right["gap"].is_number() {
+                    puzzle
+                        .blocked_edges
+                        .insert(EdgePos::new(x as i8, y as i8, Direction::Right));
+                }
+            }
+        }
+
+        let mut colors = HashMap::new();
+
+        // Process cells
+        for x in 0..width {
+            for y in 0..height {
+                let cell = &data["grid"][x * 2 + 1][(height - y) * 2 - 1];
+                let pos = Pos::new(x as i8, y as i8);
+                let nb_of_colors = colors.len();
+
+                if cell.is_null() {
+                    continue;
+                }
+
+                match cell["type"].as_str().ok_or("Failed to decode cell type")? {
+                    "triangle" => {
+                        puzzle.triangles.insert(
+                            pos,
+                            cell["count"]
+                                .as_u8()
+                                .ok_or("Couldn't decode triangle count")?,
+                        );
+                    }
+                    "square" => {
+                        puzzle.squares.insert(
+                            pos,
+                            *colors
+                                .entry(cell["color"].as_str().ok_or("Failed to decode color")?)
+                                .or_insert(nb_of_colors as u8),
+                        );
+                    }
+                    "star" => {
+                        puzzle.stars.insert(
+                            pos,
+                            *colors
+                                .entry(cell["color"].as_str().ok_or("Failed to decode color")?)
+                                .or_insert(nb_of_colors as u8),
+                        );
+                    }
+                    "poly" => {
+                        puzzle.polys.insert(
+                            pos,
+                            Poly::from(
+                                cell["polyshape"]
+                                    .as_u32()
+                                    .ok_or("Failed to decode polyshape")?,
+                            ),
+                        );
+                    }
+                    "ylop" => {
+                        puzzle.ylops.insert(
+                            pos,
+                            Poly::from(
+                                cell["polyshape"]
+                                    .as_u32()
+                                    .ok_or("Failed to decode polyshape")?,
+                            ),
+                        );
+                    }
+                    "nega" => {
+                        puzzle.cancels.insert(
+                            pos,
+                            *colors
+                                .entry(cell["color"].as_str().ok_or("Failed to decode color")?)
+                                .or_insert(nb_of_colors as u8),
+                        );
+                    }
+                    _ => {}
+                };
+            }
+        }
+
+        Ok(puzzle)
+    }
 }
 
 pub fn print_solution(sol: &[Pos]) {
-    if sol.len() == 0 {return;}
+    if sol.len() == 0 {
+        return;
+    }
 
     print!("{} ", sol[0]);
 
