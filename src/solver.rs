@@ -8,8 +8,8 @@ use crate::puzzle::*;
 pub struct PartialSolution {
     /// Candidate solution path
     path: Vec<Pos>,
-    // partial_area_left: HashSet<Pos>,
-    // partial_area_right: HashSet<Pos>,
+    partial_area_left: HashSet<Pos>,
+    partial_area_right: HashSet<Pos>,
     // /// Completed areas that have already been checked and are correct
     // full_areas: Vec<HashSet<Pos>>,
     // /// Cancels that are not yet taken by partial or full areas
@@ -22,8 +22,8 @@ impl PartialSolution {
     pub fn new(start: Pos, cancels: u8, ends: u8) -> Self {
         Self {
             path: vec![start],
-            // partial_area_left: HashSet::new(),
-            // partial_area_right: HashSet::new(),
+            partial_area_left: HashSet::new(),
+            partial_area_right: HashSet::new(),
             // full_areas: vec![],
             // cancels_left: cancels,
             reachable_ends: ends,
@@ -34,6 +34,8 @@ impl PartialSolution {
 pub struct BFSSolverConfig {
     pub simple_end_reachability_check: bool,
     pub edge_stones: bool,
+    pub partial_area_check: bool,
+    pub closed_area_check: bool,
     pub max_solutions: u32, // if 0, get all solutions
 }
 
@@ -42,6 +44,8 @@ impl Default for BFSSolverConfig {
         Self {
             simple_end_reachability_check: true,
             edge_stones: true,
+            partial_area_check: true,
+            closed_area_check: true,
             max_solutions: 0,
         }
     }
@@ -89,7 +93,7 @@ impl BFSSolver {
 
         // So long as there are states to be visited, keep processing them
         while !self.queue.is_empty() {
-            if self.queue.len() > 5_000_000 {
+            if self.queue.len() > 70_000_000 {
                 println!("Exiting here for fear of OOM");
                 return self.solutions.clone();
             }
@@ -133,12 +137,38 @@ impl BFSSolver {
                 continue;
             }
 
+            let (left, right) = EdgePos { pos: *pos, dir }.get_neighbouring_cells();
+
             // Check if we enclosed an area
-            if self.puzzle.is_outer(&next) {
-                // Clear the corresponding partial area
-                // Floodfill area and check it
+            if self.config.closed_area_check
+                && sol.path.len() > 2
+                && (!self.puzzle.contains_cell(&left) || !self.puzzle.contains_cell(&right))
+            {
+                todo!("Enclosed area checking is not yet implemented")
             }
-            // Compute partial areas
+
+            if self.config.partial_area_check {
+                // Compute & check partial areas
+                new_sol.partial_area_left.insert(left);
+                new_sol.partial_area_right.insert(right);
+
+                // If left is outside, we are going along an edge and need to clear that area
+                if !self.puzzle.contains_cell(&left) {
+                    new_sol.partial_area_left.clear();
+                }
+                // Same with right
+                if !self.puzzle.contains_cell(&right) {
+                    new_sol.partial_area_right.clear();
+                }
+
+                // Discard the solution if one of the areas is invalid
+                if self.area_invalid(&new_sol.partial_area_left) {
+                    continue;
+                }
+                if self.area_invalid(&new_sol.partial_area_right) {
+                    continue;
+                }
+            }
 
             if self.puzzle.ends.contains(&next) {
                 // With enough work on early pruning, this
@@ -158,8 +188,19 @@ impl BFSSolver {
         }
     }
 
-    fn area_invalid(&self, cells: Vec<Pos>) -> bool {
-        todo!()
+    /// Returns true if a superset of the given area
+    /// would for sure be invalid
+    fn area_invalid(&self, area: &HashSet<Pos>) -> bool {
+        // Check squares
+        let mut color: Option<Color> = None;
+        for cell in area.iter() {
+            match self.puzzle.squares.get(cell) {
+                Some(col) if color.get_or_insert(*col) != col => return true,
+                _ => {}
+            }
+        }
+
+        false
     }
 
     /// Return true if it is impossible for the partial solution
@@ -204,7 +245,7 @@ mod bfs_tests {
 
         println!("Expected: {:?}\nGot: {:?}", expected_solutions, solutions);
 
-        assert!(solutions == expected_solutions)
+        assert_eq!(solutions, expected_solutions)
     }
 
     fn test_solution_count(puzzle: &Puzzle, expected_count: usize) {
@@ -213,7 +254,7 @@ mod bfs_tests {
 
         println!("Expected: {:?}\nGot: {:?}", expected_count, solutions.len());
 
-        assert!(solutions.len() == expected_count)
+        assert_eq!(solutions.len(), expected_count)
     }
 
     #[test]

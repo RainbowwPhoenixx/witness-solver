@@ -131,8 +131,16 @@ impl EdgePos {
     }
 
     /// Return the cells left and right of the edge.
-    pub fn get_neighbouring_cells(&self) -> [Pos; 2] {
-        todo!()
+    pub fn get_neighbouring_cells(&self) -> (Pos, Pos) {
+        let x = self.pos.x;
+        let y = self.pos.y;
+
+        match self.dir {
+            Direction::Up => (Pos::new(x - 1, y), Pos::new(x, y)),
+            Direction::Down => (Pos::new(x, y - 1), Pos::new(x - 1, y - 1)),
+            Direction::Right => (Pos::new(x, y), Pos::new(x, y - 1)),
+            Direction::Left => (Pos::new(x - 1, y - 1), Pos::new(x - 1, y)),
+        }
     }
 
     fn normalize(&self) -> Self {
@@ -384,7 +392,7 @@ impl Puzzle {
         start && end && vertex_stone && edge_stone && triangle && areas_valid
     }
 
-    fn is_valid(&self, area: &HashSet<Pos>) -> bool {
+    pub fn is_valid(&self, area: &HashSet<Pos>) -> bool {
         // Check squares
         let mut color: Option<Color> = None;
         for cell in area.iter() {
@@ -499,8 +507,9 @@ impl Puzzle {
         false
     }
 
-    fn floodfill(&self, pos: Pos, edges: &Vec<EdgePos>, area: &mut HashSet<Pos>) {
-        // Perf: maybe switch the edge list for Hashset?
+    /// Returns the list of connected cells starting from `pos`, delimited by `edges`
+    pub fn floodfill(&self, pos: Pos, edges: &Vec<EdgePos>, area: &mut HashSet<Pos>) {
+        // TODO: maybe switch the edge list for Hashset?
         // Return immediately if cell is outside of the puzzle or
         // if the cell was already in the area
         if !self.contains_cell(&pos) || !area.insert(pos) {
