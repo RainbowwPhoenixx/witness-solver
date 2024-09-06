@@ -69,7 +69,6 @@ fn main() {
         partial_area_check: true,
         closed_area_check: false,
         max_solutions: 0,
-        ..Default::default()
     };
 
     let mut solver = solver::BFSSolver::new(&puzzle);

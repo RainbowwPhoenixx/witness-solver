@@ -45,7 +45,7 @@ impl Default for BFSSolverConfig {
             simple_end_reachability_check: true,
             edge_stones: true,
             partial_area_check: true,
-            closed_area_check: true,
+            closed_area_check: false, // TODO: change this when it gets implemented
             max_solutions: 0,
         }
     }

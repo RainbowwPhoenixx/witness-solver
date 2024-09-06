@@ -1,7 +1,5 @@
 #![allow(unused)]
 
-use json;
-
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -116,7 +114,7 @@ impl Display for Direction {
     }
 }
 
-#[derive(Eq, Clone, Copy, Debug, Hash)]
+#[derive(Eq, Clone, Copy, Debug)]
 pub struct EdgePos {
     pub pos: Pos,
     pub dir: Direction,
@@ -169,6 +167,14 @@ impl PartialEq for EdgePos {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
         self.normalize().true_eq(&other.normalize())
+    }
+}
+
+impl Hash for EdgePos {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let norm = self.normalize();
+        norm.pos.hash(state);
+        norm.dir.hash(state);
     }
 }
 
@@ -252,7 +258,7 @@ pub enum CellType {
     Canceller(Color),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Puzzle {
     pub width: i8,
     pub height: i8,
@@ -680,7 +686,7 @@ impl Puzzle {
 }
 
 pub fn print_solution(sol: &[Pos]) {
-    if sol.len() == 0 {
+    if sol.is_empty(){
         return;
     }
 
