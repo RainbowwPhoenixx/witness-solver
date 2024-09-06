@@ -399,6 +399,53 @@ impl Puzzle {
     }
 
     pub fn is_valid(&self, area: &HashSet<Pos>) -> bool {
+        // If there are cancels in the area
+        if let Some(cancel_pos) = self.cancels.keys().find(|p| area.contains(p)) {
+            // Try removing a symbol in the area and recurse
+            for pos in area {
+                if pos == cancel_pos {
+                    continue;
+                }
+
+                let mut new_puzzle = self.clone();
+                new_puzzle.cancels.remove(&cancel_pos);
+
+                let valid = if self.squares.contains_key(pos) {
+                    new_puzzle.squares.remove(&pos);
+                    new_puzzle.is_valid(area)
+                } else if self.stars.contains_key(pos) {
+                    new_puzzle.stars.remove(&pos);
+                    new_puzzle.is_valid(area)
+                } else if self.triangles.contains_key(pos) {
+                    new_puzzle.triangles.remove(&pos);
+                    new_puzzle.is_valid(area)
+                } else if self.polys.contains_key(pos) {
+                    new_puzzle.polys.remove(&pos);
+                    new_puzzle.is_valid(area)
+                } else if self.ylops.contains_key(pos) {
+                    new_puzzle.ylops.remove(&pos);
+                    new_puzzle.is_valid(area)
+                } else if self.cancels.contains_key(pos) {
+                    new_puzzle.cancels.remove(&pos);
+                    new_puzzle.is_valid(area)
+                } else if self.vertex_stones.contains(pos) {
+                    new_puzzle.vertex_stones.remove(&pos);
+                    new_puzzle.is_valid(area)
+                } else {
+                    false
+                };
+                // TODO: Add cancelling for edge stones
+
+                if valid {
+                    return true;
+                }
+            }
+
+            // This canceller has nothing to cancel, or none of the
+            // cancellations lead to a valid solution
+            return false;
+        }
+
         // Check squares
         let mut color: Option<Color> = None;
         for cell in area.iter() {
@@ -686,7 +733,7 @@ impl Puzzle {
 }
 
 pub fn print_solution(sol: &[Pos]) {
-    if sol.is_empty(){
+    if sol.is_empty() {
         return;
     }
 

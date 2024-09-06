@@ -133,7 +133,10 @@ impl BFSSolver {
             let mut new_sol = sol.clone();
             new_sol.path.push(next);
 
-            if self.config.edge_stones && self.stones_invalid(&new_sol) {
+            if self.config.edge_stones
+                && self.puzzle.cancels.is_empty()
+                && self.stones_invalid(&new_sol)
+            {
                 continue;
             }
 
@@ -147,7 +150,8 @@ impl BFSSolver {
                 todo!("Enclosed area checking is not yet implemented")
             }
 
-            if self.config.partial_area_check {
+            // TODO: adapt this condition to cancels
+            if self.config.partial_area_check && self.puzzle.cancels.is_empty() {
                 // Compute & check partial areas
                 new_sol.partial_area_left.insert(left);
                 new_sol.partial_area_right.insert(right);
