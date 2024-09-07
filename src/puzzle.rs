@@ -337,8 +337,12 @@ pub struct Puzzle {
     pub starts: Vec<Pos>,
     /// List of end vertices of the puzzle
     pub ends: Vec<Pos>,
-    // List of blocked edges
+    /// List of blocked edges
     pub blocked_edges: HashSet<EdgePos>,
+
+    /// Positions that are considered "outside" the puzzle
+    /// even if they are technically still "inside" the bouding square
+    pub outside_positions: HashSet<Pos>,
 
     // pub symmetry: represented by a transform?
 
@@ -361,6 +365,7 @@ impl Default for Puzzle {
             starts: vec![Pos { x: 0, y: 0 }],
             ends: vec![Pos { x: 1, y: 1 }],
             blocked_edges: Default::default(),
+            outside_positions: Default::default(),
             squares: Default::default(),
             stars: Default::default(),
             triangles: Default::default(),
@@ -383,7 +388,13 @@ impl Puzzle {
     /// Check if the cell is inside the puzzle
     #[inline(always)]
     pub fn contains_cell(&self, pos: &Pos) -> bool {
-        pos.x >= 0 && pos.x < self.width && pos.y >= 0 && pos.y < self.height
+        // First a general bounds check
+        if pos.x >= 0 && pos.x < self.width && pos.y >= 0 && pos.y < self.height {
+            // Then check if the cell is still considered "oob" even if in the bounds
+            !self.outside_positions.contains(pos)
+        } else {
+            false
+        }
     }
 
     /// Check if the position is on the puzzle boundary
@@ -737,6 +748,7 @@ impl Puzzle {
                 let nb_of_colors = colors.len();
 
                 if cell.is_null() {
+                    puzzle.outside_positions.insert(pos);
                     continue;
                 }
 

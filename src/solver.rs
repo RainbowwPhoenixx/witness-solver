@@ -258,9 +258,13 @@ mod bfs_tests {
         let mut solver = BFSSolver::new(puzzle);
         let solutions = solver.solve();
 
-        println!("Expected: {:?}\nGot: {:?}", expected_count, solutions.len());
-
-        assert_eq!(solutions.len(), expected_count)
+        assert_eq!(
+            solutions.len(),
+            expected_count,
+            "Expected: {:?}\nGot: {:?}",
+            expected_count,
+            solutions.len()
+        )
     }
 
     #[test]
