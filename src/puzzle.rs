@@ -479,6 +479,9 @@ impl Puzzle {
         start && end && vertex_stone && edge_stone && triangle && areas_valid
     }
 
+    /// Returns true if the given area is valid
+    /// 
+    /// TODO: maybe change the area to be a &Hashmap<Pos, CellType>, for a more optimized checking?
     pub fn is_valid(&self, area: &HashSet<Pos>) -> bool {
         // If there are cancels in the area
         if let Some(cancel_pos) = self.cancels.keys().find(|p| area.contains(p)) {
@@ -489,33 +492,28 @@ impl Puzzle {
                 }
 
                 let mut new_puzzle = self.clone();
-                new_puzzle.cancels.remove(&cancel_pos);
+                new_puzzle.cancels.remove(cancel_pos);
 
-                let valid = if self.squares.contains_key(pos) {
-                    new_puzzle.squares.remove(&pos);
-                    new_puzzle.is_valid(area)
-                } else if self.stars.contains_key(pos) {
-                    new_puzzle.stars.remove(&pos);
-                    new_puzzle.is_valid(area)
-                } else if self.triangles.contains_key(pos) {
-                    new_puzzle.triangles.remove(&pos);
-                    new_puzzle.is_valid(area)
-                } else if self.polys.contains_key(pos) {
-                    new_puzzle.polys.remove(&pos);
-                    new_puzzle.is_valid(area)
-                } else if self.ylops.contains_key(pos) {
-                    new_puzzle.ylops.remove(&pos);
-                    new_puzzle.is_valid(area)
-                } else if self.cancels.contains_key(pos) {
-                    new_puzzle.cancels.remove(&pos);
-                    new_puzzle.is_valid(area)
-                } else if self.vertex_stones.contains(pos) {
-                    new_puzzle.vertex_stones.remove(&pos);
+                // If the area is valid when the canceller
+                // is ignored, then its bad (does this hold true with multiple cancellers?)
+                if new_puzzle.is_valid(area) {
+                    return false;
+                }
+
+                // Only one of these should be true at once
+                let valid = if new_puzzle.squares.remove(pos).is_some()
+                    || new_puzzle.stars.remove(pos).is_some()
+                    || new_puzzle.triangles.remove(pos).is_some()
+                    || new_puzzle.polys.remove(pos).is_some()
+                    || new_puzzle.ylops.remove(pos).is_some()
+                    || new_puzzle.cancels.remove(pos).is_some()
+                    // || new_puzzle.vertex_stones.remove(pos) // this is innacurate, we need to properly check which vertices are in the area!
+                    // TODO: Add cancelling for edge stones
+                {
                     new_puzzle.is_valid(area)
                 } else {
                     false
                 };
-                // TODO: Add cancelling for edge stones
 
                 if valid {
                     return true;
@@ -865,10 +863,10 @@ mod tests {
         assert!(pos2.get_direction_to(&pos1) == Some(Direction::Down));
         assert!(pos1.get_direction_to(&pos3) == Some(Direction::Right));
         assert!(pos3.get_direction_to(&pos1) == Some(Direction::Left));
-        assert!(pos1.get_direction_to(&pos4) == None);
-        assert!(pos4.get_direction_to(&pos1) == None);
-        assert!(pos2.get_direction_to(&pos3) == None);
-        assert!(pos3.get_direction_to(&pos2) == None);
+        assert!(pos1.get_direction_to(&pos4).is_none());
+        assert!(pos4.get_direction_to(&pos1).is_none());
+        assert!(pos2.get_direction_to(&pos3).is_none());
+        assert!(pos3.get_direction_to(&pos2).is_none());
     }
 
     #[test]
