@@ -517,4 +517,18 @@ mod bfs_tests {
 
         test_solution_count(&puzzle, 12);
     }
+
+    #[test]
+    fn test_cancel() {
+        let puzzle = Puzzle {
+            width: 4,
+            height: 1,
+            ends: vec![Pos::new(4, 1)],
+            cancels: [(Pos::new(0, 0), 0)].into(),
+            stars: [(Pos::new(1, 0), 1)].into(),
+            ..Default::default()
+        };
+
+        test_solution_count(&puzzle, 8)
+    }
 }
