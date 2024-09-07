@@ -4,7 +4,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
     hash::Hash,
-    ops::{Add, Sub},
+    ops::{Add, Deref, DerefMut, Sub},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
@@ -111,6 +111,76 @@ impl Display for Direction {
                 Direction::Left => "L",
             }
         )
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SolutionPath(Vec<Pos>);
+
+impl SolutionPath {
+    pub fn new(start: Pos, dirs: String) -> Result<Self, ()> {
+        let mut res = vec![start];
+        let mut prev = start;
+
+        for char in dirs.chars() {
+            let dir = match char {
+                'U' => Direction::Up,
+                'D' => Direction::Down,
+                'R' => Direction::Right,
+                'L' => Direction::Left,
+                _ => return Err(()),
+            };
+
+            let next = prev.move_direction(dir);
+            res.push(next);
+            prev = next;
+        }
+
+        Ok(Self(res))
+    }
+}
+
+impl From<Vec<Pos>> for SolutionPath {
+    fn from(value: Vec<Pos>) -> Self {
+        Self(value)
+    }
+}
+
+impl Display for SolutionPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_empty() {
+            write!(f, "Empty solution");
+            return Ok(());
+        }
+
+        write!(f, "{} ", self[0]);
+
+        for win in self.windows(2) {
+            let prev = win[0];
+            let next = win[1];
+
+            write!(
+                f,
+                "{}",
+                prev.get_direction_to(&next).ok_or(std::fmt::Error)?
+            );
+        }
+
+        Ok(())
+    }
+}
+
+impl Deref for SolutionPath {
+    type Target = Vec<Pos>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for SolutionPath {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -331,7 +401,7 @@ impl Puzzle {
     /// Check that the proposed solution is valid
     /// This is quite expensive, and should only be used
     /// for testing, as a ground truth
-    pub fn is_solution(&self, path: &[Pos]) -> bool {
+    pub fn is_solution(&self, path: &SolutionPath) -> bool {
         if path.len() < 2 {
             return false;
         }
@@ -732,23 +802,6 @@ impl Puzzle {
     }
 }
 
-pub fn print_solution(sol: &[Pos]) {
-    if sol.is_empty() {
-        return;
-    }
-
-    print!("{} ", sol[0]);
-
-    for win in sol.windows(2) {
-        let prev = win[0];
-        let next = win[1];
-
-        print!("{}", prev.get_direction_to(&next).unwrap());
-    }
-
-    println!()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -819,7 +872,7 @@ mod tests {
             squares: [(Pos::new(0, 0), 0), (Pos::new(1, 0), 1)].into(),
             ..Default::default()
         };
-        let solution = [Pos::new(1, 0), Pos::new(1, 1)];
+        let solution = SolutionPath::new(Pos::new(1, 0), "U".into()).unwrap();
 
         assert!(puzzle.is_solution(&solution));
     }
@@ -837,18 +890,8 @@ mod tests {
             ..Default::default()
         };
         let solutions = [
-            [
-                Pos::new(1, 0),
-                Pos::new(0, 0),
-                Pos::new(0, 1),
-                Pos::new(1, 1),
-            ],
-            [
-                Pos::new(1, 0),
-                Pos::new(2, 0),
-                Pos::new(2, 1),
-                Pos::new(1, 1),
-            ],
+            SolutionPath::new(Pos::new(1, 0), "LUR".into()).unwrap(),
+            SolutionPath::new(Pos::new(1, 0), "RUL".into()).unwrap(),
         ];
 
         for sol in solutions {
@@ -875,34 +918,8 @@ mod tests {
             ..Default::default()
         };
 
-        let solution = [
-            Pos { x: 0, y: 0 },
-            Pos { x: 0, y: 1 },
-            Pos { x: 0, y: 2 },
-            Pos { x: 1, y: 2 },
-            Pos { x: 1, y: 3 },
-            Pos { x: 0, y: 3 },
-            Pos { x: 0, y: 4 },
-            Pos { x: 1, y: 4 },
-            Pos { x: 2, y: 4 },
-            Pos { x: 3, y: 4 },
-            Pos { x: 3, y: 3 },
-            Pos { x: 2, y: 3 },
-            Pos { x: 2, y: 2 },
-            Pos { x: 2, y: 1 },
-            Pos { x: 1, y: 1 },
-            Pos { x: 1, y: 0 },
-            Pos { x: 2, y: 0 },
-            Pos { x: 3, y: 0 },
-            Pos { x: 4, y: 0 },
-            Pos { x: 4, y: 1 },
-            Pos { x: 3, y: 1 },
-            Pos { x: 3, y: 2 },
-            Pos { x: 4, y: 2 },
-            Pos { x: 4, y: 3 },
-            Pos { x: 4, y: 4 },
-        ];
-
+        let solution =
+            SolutionPath::new(Pos::new(0, 0), "UURULURRRDLDDLDRRRULURUU".into()).unwrap();
         assert!(puzzle.is_solution(&solution));
     }
 }

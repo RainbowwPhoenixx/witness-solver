@@ -7,7 +7,7 @@ use crate::puzzle::*;
 #[derive(Clone)]
 pub struct PartialSolution {
     /// Candidate solution path
-    path: Vec<Pos>,
+    path: SolutionPath,
     partial_area_left: HashSet<Pos>,
     partial_area_right: HashSet<Pos>,
     // /// Completed areas that have already been checked and are correct
@@ -21,7 +21,7 @@ pub struct PartialSolution {
 impl PartialSolution {
     pub fn new(start: Pos, cancels: u8, ends: u8) -> Self {
         Self {
-            path: vec![start],
+            path: vec![start].into(),
             partial_area_left: HashSet::new(),
             partial_area_right: HashSet::new(),
             // full_areas: vec![],
@@ -57,7 +57,7 @@ pub struct BFSSolver {
     /// Queue of potential solutions, sorted from shortest to longest
     queue: VecDeque<PartialSolution>,
     /// List of solutions found so far
-    solutions: Vec<Vec<Pos>>,
+    solutions: Vec<SolutionPath>,
 
     // Statistics
     pub states_visited: u64,
@@ -77,7 +77,7 @@ impl BFSSolver {
         }
     }
 
-    pub fn solve(&mut self) -> Vec<Vec<Pos>> {
+    pub fn solve(&mut self) -> Vec<SolutionPath> {
         if !self.solutions.is_empty() {
             return self.solutions.clone();
         }
@@ -243,13 +243,15 @@ mod bfs_tests {
     use crate::puzzle::*;
     use std::collections::{HashMap, HashSet};
 
-    fn test_solutions(puzzle: &Puzzle, expected_solutions: Vec<Vec<Pos>>) {
+    fn test_solutions(puzzle: &Puzzle, expected_solutions: Vec<SolutionPath>) {
         let mut solver = BFSSolver::new(puzzle);
         let solutions = solver.solve();
 
-        println!("Expected: {:?}\nGot: {:?}", expected_solutions, solutions);
-
-        assert_eq!(solutions, expected_solutions)
+        assert_eq!(
+            solutions, expected_solutions,
+            "Expected: {:?}\nGot: {:?}",
+            expected_solutions, solutions
+        )
     }
 
     fn test_solution_count(puzzle: &Puzzle, expected_count: usize) {
@@ -265,8 +267,8 @@ mod bfs_tests {
     fn test_1x1() {
         let puzzle = Puzzle::default();
         let solutions = vec![
-            vec![Pos { x: 0, y: 0 }, Pos { x: 0, y: 1 }, Pos { x: 1, y: 1 }],
-            vec![Pos { x: 0, y: 0 }, Pos { x: 1, y: 0 }, Pos { x: 1, y: 1 }],
+            SolutionPath::new(Pos::new(0, 0), "UR".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RU".into()).unwrap(),
         ];
 
         test_solutions(&puzzle, solutions);
@@ -278,11 +280,7 @@ mod bfs_tests {
             blocked_edges: [EdgePos::new(0, 0, Direction::Up)].into(),
             ..Default::default()
         };
-        let solutions = vec![vec![
-            Pos { x: 0, y: 0 },
-            Pos { x: 1, y: 0 },
-            Pos { x: 1, y: 1 },
-        ]];
+        let solutions = vec![SolutionPath::new(Pos::new(0, 0), "RU".into()).unwrap()];
 
         test_solutions(&puzzle, solutions);
     }
@@ -294,15 +292,10 @@ mod bfs_tests {
             ..Default::default()
         };
         let solutions = vec![
-            vec![Pos { x: 0, y: 1 }, Pos { x: 1, y: 1 }],
-            vec![Pos { x: 0, y: 0 }, Pos { x: 0, y: 1 }, Pos { x: 1, y: 1 }],
-            vec![Pos { x: 0, y: 0 }, Pos { x: 1, y: 0 }, Pos { x: 1, y: 1 }],
-            vec![
-                Pos { x: 0, y: 1 },
-                Pos { x: 0, y: 0 },
-                Pos { x: 1, y: 0 },
-                Pos { x: 1, y: 1 },
-            ],
+            SolutionPath::new(Pos::new(0, 1), "R".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "UR".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RU".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 1), "DRU".into()).unwrap(),
         ];
 
         test_solutions(&puzzle, solutions);
@@ -315,15 +308,10 @@ mod bfs_tests {
             ..Default::default()
         };
         let solutions = vec![
-            vec![Pos { x: 0, y: 0 }, Pos { x: 0, y: 1 }],
-            vec![Pos { x: 0, y: 0 }, Pos { x: 0, y: 1 }, Pos { x: 1, y: 1 }],
-            vec![Pos { x: 0, y: 0 }, Pos { x: 1, y: 0 }, Pos { x: 1, y: 1 }],
-            vec![
-                Pos { x: 0, y: 0 },
-                Pos { x: 1, y: 0 },
-                Pos { x: 1, y: 1 },
-                Pos { x: 0, y: 1 },
-            ],
+            SolutionPath::new(Pos::new(0, 0), "U".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "UR".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RU".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RUL".into()).unwrap(),
         ];
 
         test_solutions(&puzzle, solutions);
@@ -336,11 +324,7 @@ mod bfs_tests {
             edge_stones: [EdgePos::new(0, 0, Direction::Right)].into(),
             ..Default::default()
         };
-        let solutions = vec![vec![
-            Pos { x: 0, y: 0 },
-            Pos { x: 1, y: 0 },
-            Pos { x: 1, y: 1 },
-        ]];
+        let solutions = vec![SolutionPath::new(Pos::new(0, 0), "RU".into()).unwrap()];
 
         test_solutions(&puzzle, solutions);
     }
@@ -358,7 +342,7 @@ mod bfs_tests {
             squares: [(Pos::new(0, 0), 0), (Pos::new(1, 0), 1)].into(),
             ..Default::default()
         };
-        let solutions = vec![vec![Pos { x: 1, y: 0 }, Pos { x: 1, y: 1 }]];
+        let solutions = vec![SolutionPath::new(Pos::new(1, 0), "U".into()).unwrap()];
 
         test_solutions(&puzzle, solutions);
     }
@@ -376,18 +360,8 @@ mod bfs_tests {
             ..Default::default()
         };
         let solutions = vec![
-            vec![
-                Pos::new(1, 0),
-                Pos::new(2, 0),
-                Pos::new(2, 1),
-                Pos::new(1, 1),
-            ],
-            vec![
-                Pos::new(1, 0),
-                Pos::new(0, 0),
-                Pos::new(0, 1),
-                Pos::new(1, 1),
-            ],
+            SolutionPath::new(Pos::new(1, 0), "RUL".into()).unwrap(),
+            SolutionPath::new(Pos::new(1, 0), "LUR".into()).unwrap(),
         ];
 
         test_solutions(&puzzle, solutions);
@@ -422,88 +396,10 @@ mod bfs_tests {
             ..Default::default()
         };
         let solutions = vec![
-            vec![
-                Pos::new(0, 0),
-                Pos::new(1, 0),
-                Pos::new(2, 0),
-                Pos::new(3, 0),
-                Pos::new(4, 0),
-                Pos::new(4, 1),
-                Pos::new(3, 1),
-                Pos::new(2, 1),
-                Pos::new(1, 1),
-                Pos::new(1, 2),
-                Pos::new(2, 2),
-                Pos::new(3, 2),
-                Pos::new(3, 3),
-                Pos::new(2, 3),
-                Pos::new(2, 4),
-                Pos::new(3, 4),
-                Pos::new(4, 4),
-            ],
-            vec![
-                Pos::new(0, 0),
-                Pos::new(0, 1),
-                Pos::new(0, 2),
-                Pos::new(0, 3),
-                Pos::new(1, 3),
-                Pos::new(2, 3),
-                Pos::new(3, 3),
-                Pos::new(3, 2),
-                Pos::new(2, 2),
-                Pos::new(1, 2),
-                Pos::new(1, 1),
-                Pos::new(2, 1),
-                Pos::new(3, 1),
-                Pos::new(3, 0),
-                Pos::new(4, 0),
-                Pos::new(4, 1),
-                Pos::new(4, 2),
-                Pos::new(4, 3),
-                Pos::new(4, 4),
-            ],
-            vec![
-                Pos::new(0, 0),
-                Pos::new(1, 0),
-                Pos::new(2, 0),
-                Pos::new(3, 0),
-                Pos::new(4, 0),
-                Pos::new(4, 1),
-                Pos::new(4, 2),
-                Pos::new(3, 2),
-                Pos::new(3, 3),
-                Pos::new(2, 3),
-                Pos::new(2, 2),
-                Pos::new(2, 1),
-                Pos::new(1, 1),
-                Pos::new(1, 2),
-                Pos::new(1, 3),
-                Pos::new(1, 4),
-                Pos::new(2, 4),
-                Pos::new(3, 4),
-                Pos::new(4, 4),
-            ],
-            vec![
-                Pos::new(0, 0),
-                Pos::new(1, 0),
-                Pos::new(2, 0),
-                Pos::new(3, 0),
-                Pos::new(4, 0),
-                Pos::new(4, 1),
-                Pos::new(3, 1),
-                Pos::new(2, 1),
-                Pos::new(1, 1),
-                Pos::new(1, 2),
-                Pos::new(2, 2),
-                Pos::new(3, 2),
-                Pos::new(3, 3),
-                Pos::new(2, 3),
-                Pos::new(1, 3),
-                Pos::new(1, 4),
-                Pos::new(2, 4),
-                Pos::new(3, 4),
-                Pos::new(4, 4),
-            ],
+            SolutionPath::new(Pos::new(0, 0), "RRRRULLLURRULURR".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "UUURRRDLLDRRDRUUUU".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RRRRUULULDDLUUURRR".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RRRRULLLURRULLURRR".into()).unwrap(),
         ];
 
         test_solutions(&puzzle, solutions);
@@ -527,35 +423,8 @@ mod bfs_tests {
             .into(),
             ..Default::default()
         };
-
-        let solution = vec![
-            Pos { x: 0, y: 0 },
-            Pos { x: 0, y: 1 },
-            Pos { x: 0, y: 2 },
-            Pos { x: 1, y: 2 },
-            Pos { x: 1, y: 3 },
-            Pos { x: 0, y: 3 },
-            Pos { x: 0, y: 4 },
-            Pos { x: 1, y: 4 },
-            Pos { x: 2, y: 4 },
-            Pos { x: 3, y: 4 },
-            Pos { x: 3, y: 3 },
-            Pos { x: 2, y: 3 },
-            Pos { x: 2, y: 2 },
-            Pos { x: 2, y: 1 },
-            Pos { x: 1, y: 1 },
-            Pos { x: 1, y: 0 },
-            Pos { x: 2, y: 0 },
-            Pos { x: 3, y: 0 },
-            Pos { x: 4, y: 0 },
-            Pos { x: 4, y: 1 },
-            Pos { x: 3, y: 1 },
-            Pos { x: 3, y: 2 },
-            Pos { x: 4, y: 2 },
-            Pos { x: 4, y: 3 },
-            Pos { x: 4, y: 4 },
-        ];
-
+        let solution =
+            SolutionPath::new(Pos::new(0, 0), "UURULURRRDLDDLDRRRULURUU".into()).unwrap();
         test_solutions(&puzzle, vec![solution]);
     }
 
@@ -576,40 +445,11 @@ mod bfs_tests {
             .into(),
             ..Default::default()
         };
-
         let solutions = vec![
-            vec![
-                Pos::new(0, 0),
-                Pos::new(1, 0),
-                Pos::new(1, 1),
-                Pos::new(2, 1),
-                Pos::new(3, 1),
-            ],
-            vec![
-                Pos::new(0, 0),
-                Pos::new(1, 0),
-                Pos::new(2, 0),
-                Pos::new(2, 1),
-                Pos::new(3, 1),
-            ],
-            vec![
-                Pos::new(0, 0),
-                Pos::new(0, 1),
-                Pos::new(1, 1),
-                Pos::new(1, 0),
-                Pos::new(2, 0),
-                Pos::new(3, 0),
-                Pos::new(3, 1),
-            ],
-            vec![
-                Pos::new(0, 0),
-                Pos::new(0, 1),
-                Pos::new(1, 1),
-                Pos::new(2, 1),
-                Pos::new(2, 0),
-                Pos::new(3, 0),
-                Pos::new(3, 1),
-            ],
+            SolutionPath::new(Pos::new(0, 0), "RURR".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RRUR".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "URDRRU".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "URRDRU".into()).unwrap(),
         ];
 
         test_solutions(&puzzle, solutions)
