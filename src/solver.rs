@@ -535,4 +535,16 @@ mod bfs_tests {
 
         test_solution_count(&puzzle, 8)
     }
+
+    #[test]
+    fn test_cancel_and_hexagons() {
+        let puzzle = Puzzle {
+            cancels: [(Pos::new(0, 1), 0)].into(),
+            edge_stones: [EdgePos::new(1, 1, Direction::Up)].into(),
+            vertex_stones: [Pos::new(1, 1)].into(),
+            ..Puzzle::default_with_size(4, 4)
+        };
+
+        test_solution_count(&puzzle, 3678)
+    }
 }

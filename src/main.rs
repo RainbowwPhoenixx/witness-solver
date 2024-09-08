@@ -38,7 +38,7 @@ fn main() {
         );
     }
 
-    for solution in &solutions[..10] {
+    for solution in &solutions[..solutions.len().min(10)] {
         println!("{} moves: {}", solution.len() - 1, solution);
     }
 }

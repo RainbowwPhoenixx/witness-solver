@@ -361,7 +361,7 @@ pub struct Area {
     /// An edge is in the area if both cells surrounding it are either:
     /// - in the area
     /// - considered "outside" the puzzle
-    /// 
+    ///
     /// and it is not part of the solution path.
     edges: HashSet<EdgePos>,
 
@@ -422,6 +422,17 @@ impl Default for Puzzle {
 }
 
 impl Puzzle {
+    /// Returns a new puzzle with the given dimentions, with the start in the
+    /// bottom left and then end in the bottom right
+    pub fn default_with_size(width: i8, height: i8) -> Self {
+        Self {
+            width,
+            height,
+            ends: vec![Pos::new(width, height)],
+            ..Default::default()
+        }
+    }
+
     /// Check if the vertex is inside the puzzle
     #[inline(always)]
     pub fn contains_vertex(&self, pos: &Pos) -> bool {
@@ -487,72 +498,62 @@ impl Puzzle {
 
     /// Returns true if the given area is valid
     ///
+    /// This function check if an area is valid in the following order
+    /// - Check independant position based constraints (triangles and hexagons)
+    ///   and use them to immediately remove obvious cancels without the need to recurse
+    /// - If there are still cancels, try canelling a symbol in the area, then recurse
+    ///   until you get a result
+    /// - If no more cancels are left, check the rest of the conditions (squares, stars, polys)
+    ///
+    /// This order of operations tries to limit recursions and canceller attempts by removing
+    /// as many cancellers as early as possible.
+    ///
+    ///
     /// TODO: maybe change the area to be a &Hashmap<Pos, CellType>, for a more optimized checking?
-    /// this would also avoid having to clone the whole ass puzzle for cancelers, and only the area!
+    /// this would also allow recursing on the area instead of the whole ass puzzle, and avoid duplicate
+    /// computation!
     /// it would make the actual checks a little clunkier though
     pub fn is_valid(&self, path: &SolutionPath, area: &Area) -> bool {
-        // TODO: check triangles and hexagons before cancels
-        //       since they are "standalone" and don't interact
-        //       with any other constraint (except cancels)
-        //       we can just count the wrong ones here and consume
-        //       the cancelers before the expensive job of trying
-        //       to match them against every other constraint
-
-        // If there are cancels in the area
-        if let Some(cancel_pos) = self.cancels.keys().find(|p| area.cells.contains(p)) {
-            // Try removing a symbol in the area and recurse
-            // TODO: only cancel one of each type (no need to try cancelling two different white squares for example, it'll lead to the same result)
-            for pos in &area.cells {
-                if pos == cancel_pos {
-                    continue;
-                }
-
-                let mut new_puzzle = self.clone();
-                new_puzzle.cancels.remove(cancel_pos);
-
-                // If the area is valid when the canceller
-                // is ignored, then its bad (does this hold true with multiple cancellers?)
-                if new_puzzle.is_valid(path, area) {
-                    return false;
-                }
-
-                // Only one of these should be true at once
-                let valid = if new_puzzle.squares.remove(pos).is_some()
-                    || new_puzzle.stars.remove(pos).is_some()
-                    || new_puzzle.triangles.remove(pos).is_some()
-                    || new_puzzle.polys.remove(pos).is_some()
-                    || new_puzzle.ylops.remove(pos).is_some()
-                    || new_puzzle.cancels.remove(pos).is_some()
-                // || new_puzzle.vertex_stones.remove(pos) // this is innacurate, we need to properly check which vertices are in the area!
-                // TODO: Add cancelling for edge stones
-                {
-                    new_puzzle.is_valid(path, area)
-                } else {
-                    false
-                };
-
-                if valid {
-                    return true;
-                }
-            }
-
-            // This canceller has nothing to cancel, or none of the
-            // cancellations lead to a valid solution
-            return false;
-        }
-
         let Ok(path_edges) = path.try_as_edge_path() else {
             return false;
         };
 
+        let mut puzzle_without_obvious_cancels = self.clone();
+
+        let mut cancels_in_area: Vec<_> = self
+            .cancels
+            .keys()
+            .filter(|p| area.cells.contains(p))
+            .collect();
+
         // Check hexagons
         for corner in &area.corners {
             if self.vertex_stones.contains(corner) {
+                if let Some(&&cancel_pos) = cancels_in_area.first() {
+                    cancels_in_area.swap_remove(0);
+                    puzzle_without_obvious_cancels
+                        .cancels
+                        .remove(&cancel_pos)
+                        .unwrap();
+                    puzzle_without_obvious_cancels.vertex_stones.remove(corner);
+                    // We used up a canceller to remove this error, just skip to the next one
+                    continue;
+                }
                 return false;
             }
         }
         for edge in &area.edges {
             if self.edge_stones.contains(edge) {
+                if let Some(&&cancel_pos) = cancels_in_area.first() {
+                    cancels_in_area.swap_remove(0);
+                    puzzle_without_obvious_cancels
+                        .cancels
+                        .remove(&cancel_pos)
+                        .unwrap();
+                    puzzle_without_obvious_cancels.edge_stones.remove(edge);
+                    // We used up a canceller to remove this error, just skip to the next one
+                    continue;
+                }
                 return false;
             }
         }
@@ -568,10 +569,64 @@ impl Puzzle {
                             .filter(|edge| path_edges.contains(edge))
                             .count() =>
                 {
-                    return false
+                    if let Some(&&cancel_pos) = cancels_in_area.first() {
+                        cancels_in_area.swap_remove(0);
+                        puzzle_without_obvious_cancels
+                            .cancels
+                            .remove(&cancel_pos)
+                            .unwrap();
+                        puzzle_without_obvious_cancels.triangles.remove(cell);
+                        // We used up a canceller to remove this error, just skip to the next one
+                        continue;
+                    }
+                    return false;
                 }
                 _ => {}
             }
+        }
+
+        // If there are still cancels in the area
+        if let Some(cancel_pos) = puzzle_without_obvious_cancels
+            .cancels
+            .keys()
+            .find(|p| area.cells.contains(p))
+        {
+            // Try removing a symbol in the area and recurse
+            // TODO: only cancel one of each type (no need to try cancelling two different white squares for example, it'll lead to the same result)
+            for pos in &area.cells {
+                if pos == cancel_pos {
+                    continue;
+                }
+
+                let mut new_puzzle = puzzle_without_obvious_cancels.clone();
+                new_puzzle.cancels.remove(cancel_pos);
+
+                // If the area is valid when the canceller
+                // is ignored, then its bad (does this hold true with multiple cancellers?)
+                if new_puzzle.is_valid(path, area) {
+                    return false;
+                }
+
+                // Only one of these should be true at once
+                let valid = if new_puzzle.squares.remove(pos).is_some()
+                    || new_puzzle.stars.remove(pos).is_some()
+                    || new_puzzle.polys.remove(pos).is_some()
+                    || new_puzzle.ylops.remove(pos).is_some()
+                    || new_puzzle.cancels.remove(pos).is_some()
+                {
+                    new_puzzle.is_valid(path, area)
+                } else {
+                    false
+                };
+
+                if valid {
+                    return true;
+                }
+            }
+
+            // This canceller has nothing to cancel, or none of the
+            // cancellations lead to a valid solution
+            return false;
         }
 
         // Check squares
@@ -596,14 +651,6 @@ impl Puzzle {
             for square_color in area.cells.iter().filter_map(|pos| self.squares.get(pos)) {
                 match color_counts.get(square_color) {
                     Some(1) => *color_counts.get_mut(square_color).unwrap() = 2,
-                    Some(_) => return false,
-                    None => {}
-                }
-            }
-
-            for canceller_color in area.cells.iter().filter_map(|pos| self.cancels.get(pos)) {
-                match color_counts.get(canceller_color) {
-                    Some(1) => *color_counts.get_mut(canceller_color).unwrap() = 2,
                     Some(_) => return false,
                     None => {}
                 }
@@ -738,7 +785,7 @@ impl Puzzle {
 
                 // See if the corners are in the area
                 for corner in crossing_edge.get_neighbouring_corners() {
-                    if path_positions.contains(&corner) {
+                    if !path_positions.contains(&corner) {
                         area_corners.insert(corner);
                     }
                 }
