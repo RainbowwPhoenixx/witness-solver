@@ -11,7 +11,7 @@ Illustrations in this readme are made using https://witnesspuzzles.com/
 - Stars
 - Triangles
 - Polyominoes
-- Cancels (except they cannot yet cancel hexagons on edges, and also disables some optimisations discussed below)
+- Cancels (except they cannot yet cancel hexagons, and also disables some of the optimisations discussed below)
 
 ## Search features
 The following search features are ordered chronologically from first implemented to last implemented. The times in the performance tables are not meant to be taken at face value, the important value is the number of states searched.

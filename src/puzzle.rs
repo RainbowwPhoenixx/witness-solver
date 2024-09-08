@@ -63,11 +63,22 @@ impl Pos {
     #[inline(always)]
     pub fn get_cell_edges(&self) -> [EdgePos; 4] {
         [
-            EdgePos::new(self.x, self.y + 1, Direction::Right),
-            EdgePos::new(self.x, self.y, Direction::Right),
-            EdgePos::new(self.x + 1, self.y, Direction::Up),
-            EdgePos::new(self.x, self.y, Direction::Up),
+            self.get_cell_edge_in_direction(Direction::Up),
+            self.get_cell_edge_in_direction(Direction::Down),
+            self.get_cell_edge_in_direction(Direction::Right),
+            self.get_cell_edge_in_direction(Direction::Left),
         ]
+    }
+
+    /// Returns the edge in the given direction
+    #[inline(always)]
+    pub fn get_cell_edge_in_direction(&self, dir: Direction) -> EdgePos {
+        match dir {
+            Direction::Up => EdgePos::new(self.x, self.y + 1, Direction::Right),
+            Direction::Down => EdgePos::new(self.x, self.y, Direction::Right),
+            Direction::Right => EdgePos::new(self.x + 1, self.y, Direction::Up),
+            Direction::Left => EdgePos::new(self.x, self.y, Direction::Up),
+        }
     }
 
     #[inline(always)]
@@ -137,6 +148,16 @@ impl SolutionPath {
         }
 
         Ok(Self(res))
+    }
+
+    pub fn try_as_edge_path(&self) -> Result<Vec<EdgePos>, ()> {
+        let mut path_edges = Vec::with_capacity(self.len() - 1);
+        for window in self.windows(2) {
+            let dir = window[0].get_direction_to(&window[1]).ok_or(())?;
+            path_edges.push(EdgePos::new(window[0].x, window[0].y, dir))
+        }
+
+        Ok(path_edges)
     }
 }
 
@@ -209,6 +230,11 @@ impl EdgePos {
             Direction::Right => (Pos::new(x, y), Pos::new(x, y - 1)),
             Direction::Left => (Pos::new(x - 1, y - 1), Pos::new(x - 1, y)),
         }
+    }
+
+    /// Return the corners at the ends of edge
+    pub fn get_neighbouring_corners(&self) -> [Pos; 2] {
+        [self.pos, self.pos.move_direction(self.dir)]
     }
 
     fn normalize(&self) -> Self {
@@ -328,6 +354,23 @@ pub enum CellType {
     Canceller(Color),
 }
 
+pub struct Area {
+    /// All the cells contained in the area
+    cells: HashSet<Pos>,
+
+    /// An edge is in the area if both cells surrounding it are either:
+    /// - in the area
+    /// - considered "outside" the puzzle
+    /// 
+    /// and it is not part of the solution path.
+    edges: HashSet<EdgePos>,
+
+    /// A corner is in the area if:
+    /// - the 4 adjacent cells must be either in the area or outside the puzzle
+    /// - the pos is not part of the path
+    corners: HashSet<Pos>,
+}
+
 #[derive(Clone, Debug)]
 pub struct Puzzle {
     pub width: i8,
@@ -418,75 +461,48 @@ impl Puzzle {
         }
 
         // Check start and end
-        let start = self.starts.contains(path.first().unwrap());
-        let end = self.ends.contains(path.last().unwrap());
-
-        // Get edges
-        let mut path_edges = Vec::with_capacity(path.len() - 1);
-        for window in path.windows(2) {
-            let dir = window[0].get_direction_to(&window[1]);
-
-            if dir.is_none() {
-                return false;
-            }
-
-            path_edges.push(EdgePos::new(window[0].x, window[0].y, dir.unwrap()))
+        if !self.starts.contains(path.first().unwrap()) {
+            return false;
+        }
+        if !self.ends.contains(path.last().unwrap()) {
+            return false;
         }
 
-        // Check stones
-        let vertex_stone = self.vertex_stones.iter().all(|pos| path.contains(pos));
-        let edge_stone = self
-            .edge_stones
-            .iter()
-            .all(|edge| path_edges.contains(edge));
-
-        // Check triangles
-        let mut triangle = true;
-        for (triangle_pos, count) in self.triangles.iter() {
-            let cell_edges = &triangle_pos.get_cell_edges();
-            let filled_cell_edges_count = cell_edges
-                .iter()
-                .filter(|edge| path_edges.contains(edge))
-                .count();
-
-            if filled_cell_edges_count != *count as usize {
-                triangle = false;
-                break;
-            }
-        }
-
-        // Compute areas
-        let areas_valid =
-            if !self.squares.is_empty() || !self.stars.is_empty() || !self.polys.is_empty() {
-                let mut areas: Vec<HashSet<Pos>> = vec![];
-                for x in 0..self.width {
-                    for y in 0..self.height {
-                        let pos = Pos::new(x, y);
-                        if !areas.iter().any(|area| area.contains(&pos)) {
-                            // Floodfill from this cell
-                            let mut area = HashSet::new();
-                            self.floodfill(pos, &path_edges, &mut area);
-                            areas.push(area);
-                        }
+        let mut all_visited = HashSet::new();
+        for x in 0..self.width {
+            for y in 0..self.height {
+                let pos = Pos::new(x, y);
+                if !all_visited.contains(&pos) {
+                    let area = self.floodfill(pos, path);
+                    if !self.is_valid(path, &area) {
+                        return false;
                     }
+                    all_visited.extend(area.cells);
                 }
-                // Check areas
-                areas.iter().all(|area| self.is_valid(area))
-            } else {
-                true
-            };
+            }
+        }
 
-        start && end && vertex_stone && edge_stone && triangle && areas_valid
+        true
     }
 
     /// Returns true if the given area is valid
-    /// 
+    ///
     /// TODO: maybe change the area to be a &Hashmap<Pos, CellType>, for a more optimized checking?
-    pub fn is_valid(&self, area: &HashSet<Pos>) -> bool {
+    /// this would also avoid having to clone the whole ass puzzle for cancelers, and only the area!
+    /// it would make the actual checks a little clunkier though
+    pub fn is_valid(&self, path: &SolutionPath, area: &Area) -> bool {
+        // TODO: check triangles and hexagons before cancels
+        //       since they are "standalone" and don't interact
+        //       with any other constraint (except cancels)
+        //       we can just count the wrong ones here and consume
+        //       the cancelers before the expensive job of trying
+        //       to match them against every other constraint
+
         // If there are cancels in the area
-        if let Some(cancel_pos) = self.cancels.keys().find(|p| area.contains(p)) {
+        if let Some(cancel_pos) = self.cancels.keys().find(|p| area.cells.contains(p)) {
             // Try removing a symbol in the area and recurse
-            for pos in area {
+            // TODO: only cancel one of each type (no need to try cancelling two different white squares for example, it'll lead to the same result)
+            for pos in &area.cells {
                 if pos == cancel_pos {
                     continue;
                 }
@@ -496,7 +512,7 @@ impl Puzzle {
 
                 // If the area is valid when the canceller
                 // is ignored, then its bad (does this hold true with multiple cancellers?)
-                if new_puzzle.is_valid(area) {
+                if new_puzzle.is_valid(path, area) {
                     return false;
                 }
 
@@ -507,10 +523,10 @@ impl Puzzle {
                     || new_puzzle.polys.remove(pos).is_some()
                     || new_puzzle.ylops.remove(pos).is_some()
                     || new_puzzle.cancels.remove(pos).is_some()
-                    // || new_puzzle.vertex_stones.remove(pos) // this is innacurate, we need to properly check which vertices are in the area!
-                    // TODO: Add cancelling for edge stones
+                // || new_puzzle.vertex_stones.remove(pos) // this is innacurate, we need to properly check which vertices are in the area!
+                // TODO: Add cancelling for edge stones
                 {
-                    new_puzzle.is_valid(area)
+                    new_puzzle.is_valid(path, area)
                 } else {
                     false
                 };
@@ -525,9 +541,42 @@ impl Puzzle {
             return false;
         }
 
+        let Ok(path_edges) = path.try_as_edge_path() else {
+            return false;
+        };
+
+        // Check hexagons
+        for corner in &area.corners {
+            if self.vertex_stones.contains(corner) {
+                return false;
+            }
+        }
+        for edge in &area.edges {
+            if self.edge_stones.contains(edge) {
+                return false;
+            }
+        }
+
+        // Check triangles
+        for cell in area.cells.iter() {
+            match self.triangles.get(cell) {
+                Some(&count)
+                    if count as usize
+                        != cell
+                            .get_cell_edges()
+                            .iter()
+                            .filter(|edge| path_edges.contains(edge))
+                            .count() =>
+                {
+                    return false
+                }
+                _ => {}
+            }
+        }
+
         // Check squares
         let mut color: Option<Color> = None;
-        for cell in area.iter() {
+        for cell in area.cells.iter() {
             match self.squares.get(cell) {
                 Some(col) if color.get_or_insert(*col) != col => return false,
                 _ => {}
@@ -536,7 +585,7 @@ impl Puzzle {
 
         // Check stars
         let mut color_counts: HashMap<Color, u8> = HashMap::new();
-        for &star_color in area.iter().filter_map(|pos| self.stars.get(pos)) {
+        for &star_color in area.cells.iter().filter_map(|pos| self.stars.get(pos)) {
             *color_counts.entry(star_color).or_insert(0) += 1;
             if color_counts[&star_color] > 2 {
                 return false;
@@ -544,7 +593,7 @@ impl Puzzle {
         }
         // If there is a star in the area, do the other checks, only on the star colors of course
         if !color_counts.is_empty() {
-            for square_color in area.iter().filter_map(|pos| self.squares.get(pos)) {
+            for square_color in area.cells.iter().filter_map(|pos| self.squares.get(pos)) {
                 match color_counts.get(square_color) {
                     Some(1) => *color_counts.get_mut(square_color).unwrap() = 2,
                     Some(_) => return false,
@@ -552,7 +601,7 @@ impl Puzzle {
                 }
             }
 
-            for canceller_color in area.iter().filter_map(|pos| self.cancels.get(pos)) {
+            for canceller_color in area.cells.iter().filter_map(|pos| self.cancels.get(pos)) {
                 match color_counts.get(canceller_color) {
                     Some(1) => *color_counts.get_mut(canceller_color).unwrap() = 2,
                     Some(_) => return false,
@@ -565,7 +614,7 @@ impl Puzzle {
             }
         }
 
-        if !self.check_tetris(area) {
+        if !self.check_tetris(&area.cells) {
             return false;
         }
 
@@ -640,24 +689,68 @@ impl Puzzle {
     }
 
     /// Returns the list of connected cells starting from `pos`, delimited by `edges`
-    pub fn floodfill(&self, pos: Pos, edges: &Vec<EdgePos>, area: &mut HashSet<Pos>) {
+    pub fn floodfill(&self, pos: Pos, path: &SolutionPath) -> Area {
+        let mut cells = HashSet::new();
+        let mut edges = HashSet::new();
+        let mut corners = HashSet::new();
+
+        self.floodfill_recur(
+            pos,
+            path,
+            &path.try_as_edge_path().unwrap(),
+            &mut cells,
+            &mut edges,
+            &mut corners,
+        );
+
+        Area {
+            cells,
+            edges,
+            corners,
+        }
+    }
+
+    pub fn floodfill_recur(
+        &self,
+        pos: Pos,
+        path_positions: &Vec<Pos>,
+        path_edges: &Vec<EdgePos>,
+        area_cells: &mut HashSet<Pos>,
+        area_edges: &mut HashSet<EdgePos>,
+        area_corners: &mut HashSet<Pos>,
+    ) {
         // TODO: maybe switch the edge list for Hashset?
+
         // Return immediately if cell is outside of the puzzle or
         // if the cell was already in the area
-        if !self.contains_cell(&pos) || !area.insert(pos) {
+        if !self.contains_cell(&pos) || !area_cells.insert(pos) {
             return;
         }
 
         for dir in Direction::VARIANTS {
-            let crossing_edge = match dir {
-                Direction::Up => EdgePos::new(pos.x, pos.y + 1, Direction::Right),
-                Direction::Down => EdgePos::new(pos.x, pos.y, Direction::Right),
-                Direction::Right => EdgePos::new(pos.x + 1, pos.y, Direction::Up),
-                Direction::Left => EdgePos::new(pos.x, pos.y, Direction::Up),
-            };
+            let crossing_edge = pos.get_cell_edge_in_direction(dir);
 
-            if !edges.contains(&crossing_edge) {
-                self.floodfill(pos.move_direction(dir), edges, area);
+            if !path_edges.contains(&crossing_edge) {
+                // pos is in the area and is not an outside cell
+                // the crossing edge is not part of the path
+                // therefore it must be in the area
+                area_edges.insert(crossing_edge);
+
+                // See if the corners are in the area
+                for corner in crossing_edge.get_neighbouring_corners() {
+                    if path_positions.contains(&corner) {
+                        area_corners.insert(corner);
+                    }
+                }
+
+                self.floodfill_recur(
+                    pos.move_direction(dir),
+                    path_positions,
+                    path_edges,
+                    area_cells,
+                    area_edges,
+                    area_corners,
+                );
             }
         }
     }
