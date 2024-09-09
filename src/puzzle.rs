@@ -1052,10 +1052,6 @@ mod tests {
     #[test]
     fn test_triangles() {
         let puzzle = Puzzle {
-            width: 4,
-            height: 4,
-            starts: vec![Pos::new(0, 0)],
-            ends: vec![Pos::new(4, 4)],
             triangles: [
                 (Pos::new(0, 3), 3),
                 (Pos::new(1, 3), 1),
@@ -1065,7 +1061,7 @@ mod tests {
                 (Pos::new(2, 0), 1),
             ]
             .into(),
-            ..Default::default()
+            ..Puzzle::default_with_size(4, 4)
         };
 
         let solution =

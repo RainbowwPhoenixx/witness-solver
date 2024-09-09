@@ -376,10 +376,6 @@ mod bfs_tests {
         // This puzzle is an actual puzzle example from the game that
         // contains broken paths, stars, and squares
         let puzzle = Puzzle {
-            width: 4,
-            height: 4,
-            starts: vec![Pos::new(0, 0)],
-            ends: vec![Pos::new(4, 4)],
             blocked_edges: [
                 EdgePos::new(0, 4, Direction::Right),
                 EdgePos::new(3, 3, Direction::Right),
@@ -397,7 +393,7 @@ mod bfs_tests {
             ]
             .into(),
             stars: [(Pos::new(3, 0), 5), (Pos::new(0, 3), 5)].into(),
-            ..Default::default()
+            ..Puzzle::default_with_size(4, 4)
         };
         let solutions = vec![
             SolutionPath::new(Pos::new(0, 0), "RRRRULLLURRULURR".into()).unwrap(),
@@ -412,10 +408,6 @@ mod bfs_tests {
     #[test]
     fn test_triangles() {
         let puzzle = Puzzle {
-            width: 4,
-            height: 4,
-            starts: vec![Pos::new(0, 0)],
-            ends: vec![Pos::new(4, 4)],
             triangles: [
                 (Pos::new(0, 3), 3),
                 (Pos::new(1, 3), 1),
@@ -425,7 +417,7 @@ mod bfs_tests {
                 (Pos::new(2, 0), 1),
             ]
             .into(),
-            ..Default::default()
+            ..Puzzle::default_with_size(4, 4)
         };
         let solution =
             SolutionPath::new(Pos::new(0, 0), "UURULURRRDLDDLDRRRULURUU".into()).unwrap();
@@ -435,10 +427,6 @@ mod bfs_tests {
     #[test]
     fn test_poly() {
         let puzzle = Puzzle {
-            width: 3,
-            height: 1,
-            starts: vec![Pos::new(0, 0)],
-            ends: vec![Pos::new(3, 1)],
             polys: [(
                 Pos::new(1, 0),
                 Poly {
@@ -447,7 +435,7 @@ mod bfs_tests {
                 },
             )]
             .into(),
-            ..Default::default()
+            ..Puzzle::default_with_size(3, 1)
         };
         let solutions = vec![
             SolutionPath::new(Pos::new(0, 0), "RURR".into()).unwrap(),
@@ -462,10 +450,6 @@ mod bfs_tests {
     #[test]
     fn test_polys() {
         let puzzle = Puzzle {
-            width: 3,
-            height: 3,
-            starts: vec![Pos::new(0, 0)],
-            ends: vec![Pos::new(3, 3)],
             polys: [
                 (
                     Pos::new(1, 1),
@@ -489,7 +473,7 @@ mod bfs_tests {
                 ),
             ]
             .into(),
-            ..Default::default()
+            ..Puzzle::default_with_size(3, 3)
         };
 
         test_solution_count(&puzzle, 17)
@@ -498,10 +482,6 @@ mod bfs_tests {
     #[test]
     fn test_poly_rotation() {
         let puzzle = Puzzle {
-            width: 3,
-            height: 3,
-            starts: vec![Pos::new(0, 0)],
-            ends: vec![Pos::new(3, 3)],
             polys: [(
                 Pos::new(1, 1),
                 Poly {
@@ -516,7 +496,7 @@ mod bfs_tests {
                 },
             )]
             .into(),
-            ..Default::default()
+            ..Puzzle::default_with_size(3, 3)
         };
 
         test_solution_count(&puzzle, 12);
@@ -525,12 +505,9 @@ mod bfs_tests {
     #[test]
     fn test_cancel() {
         let puzzle = Puzzle {
-            width: 4,
-            height: 1,
-            ends: vec![Pos::new(4, 1)],
             cancels: [(Pos::new(0, 0), 0)].into(),
             stars: [(Pos::new(1, 0), 1)].into(),
-            ..Default::default()
+            ..Puzzle::default_with_size(4, 1)
         };
 
         test_solution_count(&puzzle, 8)
