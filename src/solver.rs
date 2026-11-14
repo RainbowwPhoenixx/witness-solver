@@ -429,10 +429,7 @@ mod bfs_tests {
         let puzzle = Puzzle {
             polys: [(
                 Pos::new(1, 0),
-                Poly {
-                    rotatable: false,
-                    minos: [Pos::new(0, 0), Pos::new(1, 0)].into(),
-                },
+                Poly::new(false, [Pos::new(0, 0), Pos::new(1, 0)].into()),
             )]
             .into(),
             ..Puzzle::default_with_size(3, 1)
@@ -453,24 +450,18 @@ mod bfs_tests {
             polys: [
                 (
                     Pos::new(1, 1),
-                    Poly {
-                        rotatable: false,
-                        minos: [
+                    Poly::new(
+                        false,
+                        [
                             Pos::new(0, 0),
                             Pos::new(1, 0),
                             Pos::new(0, 1),
                             Pos::new(1, 1),
                         ]
                         .into(),
-                    },
+                    ),
                 ),
-                (
-                    Pos::new(2, 1),
-                    Poly {
-                        rotatable: false,
-                        minos: [Pos::new(0, 0)].into(),
-                    },
-                ),
+                (Pos::new(2, 1), Poly::new(false, [Pos::new(0, 0)].into())),
             ]
             .into(),
             ..Puzzle::default_with_size(3, 3)
@@ -484,16 +475,16 @@ mod bfs_tests {
         let puzzle = Puzzle {
             polys: [(
                 Pos::new(1, 1),
-                Poly {
-                    rotatable: true,
-                    minos: [
+                Poly::new(
+                    true,
+                    [
                         Pos::new(0, 0),
                         Pos::new(1, 0),
                         Pos::new(0, 1),
                         Pos::new(-1, 0),
                     ]
                     .into(),
-                },
+                ),
             )]
             .into(),
             ..Puzzle::default_with_size(3, 3)

@@ -2,7 +2,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    fmt::Display,
+    fmt::{Display, Write},
     hash::Hash,
     ops::{Add, Deref, DerefMut, Sub},
 };
@@ -279,8 +279,8 @@ pub type Color = u8;
 /// Represents a polyonmino
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub struct Poly {
-    pub rotatable: bool,
-    pub minos: Vec<Pos>,
+    rotatable: bool,
+    minos: Vec<Pos>,
 }
 
 impl From<u32> for Poly {
@@ -296,11 +296,27 @@ impl From<u32> for Poly {
             }
         }
 
-        Self { rotatable, minos }
+        Self::new(rotatable, minos)
     }
 }
 
 impl Poly {
+    pub fn new(mut rotatable: bool, minos: Vec<Pos>) -> Self {
+        let mut res = Self { rotatable, minos };
+        // Set rotatable to false if mino has rotationnal symmetry
+        res.normalize();
+        if rotatable {
+            let mut copy = res.clone();
+            copy.rotate_clockwise();
+
+            if copy == res {
+                res.rotatable = false
+            }
+        }
+
+        res
+    }
+
     /// Returns the possible rotations for a polyomino
     /// depending on if it is rotatable or
     /// TODO: precompute, cause this gets called a LOT per piece
@@ -329,6 +345,54 @@ impl Poly {
             };
             *block = new_pos;
         }
+    }
+
+    /// Get the max width and height of the mino
+    ///
+    /// Computationally expensive
+    pub(crate) fn dims(&self) -> (i8, i8) {
+        let mut xmin = self.minos[0].x;
+        let mut xmax = xmin;
+        let mut ymin = self.minos[0].y;
+        let mut ymax = ymin;
+
+        for block in &self.minos[1..] {
+            xmin = xmin.min(block.x);
+            xmax = xmax.max(block.x);
+            ymin = ymin.min(block.y);
+            ymax = ymax.max(block.y);
+        }
+
+        (
+            (xmax.abs_diff(xmin) + 1) as i8,
+            (ymax.abs_diff(ymin) + 1) as i8,
+        )
+    }
+
+    /// Normalize a mino to have all positive coords
+    ///
+    /// Computationally expensive
+    pub(crate) fn normalize(&mut self) {
+        let mut xmin = self.minos[0].x;
+        let mut ymin = self.minos[0].y;
+
+        for block in &self.minos[1..] {
+            xmin = xmin.min(block.x);
+            ymin = ymin.min(block.y);
+        }
+
+        for block in &mut self.minos {
+            block.x -= xmin;
+            block.y -= ymin;
+        }
+    }
+
+    pub fn rotatable(&self) -> bool {
+        self.rotatable
+    }
+
+    pub fn minos(&self) -> &[Pos] {
+        &self.minos
     }
 }
 
@@ -460,7 +524,7 @@ impl Puzzle {
     /// Check if the given edge is broken
     #[inline(always)]
     pub fn is_blocked(&self, edge: &EdgePos) -> bool {
-        self.blocked_edges.contains(&edge.normalize())
+        self.blocked_edges.contains(&edge)
     }
 
     /// Check that the proposed solution is valid
@@ -501,7 +565,7 @@ impl Puzzle {
     /// This function check if an area is valid in the following order
     /// - Check independant position based constraints (triangles and hexagons)
     ///   and use them to immediately remove obvious cancels without the need to recurse
-    /// - If there are still cancels, try canelling a symbol in the area, then recurse
+    /// - If there are still cancels, try cancelling a symbol in the area, then recurse
     ///   until you get a result
     /// - If no more cancels are left, check the rest of the conditions (squares, stars, polys)
     ///
@@ -698,6 +762,7 @@ impl Puzzle {
     /// This implementation is heavily inspired from jbdarkid's solver
     /// This is currently implemented using a perly recursive strategy
     /// TODO: switch to backtracking to improve memory footprint
+    /// TODO: try placing the bigger polys first
     fn can_tile(&self, polys: Vec<&Poly>, ylops: Vec<&Poly>, area: &HashMap<Pos, i16>) -> bool {
         // Insert stop condition(s) here
         if polys.is_empty() && ylops.is_empty() {
@@ -705,7 +770,7 @@ impl Puzzle {
         }
 
         // Find a square that is not covered
-        let square = area.iter().find(|(_pos, &value)| value < 1).unwrap();
+        let square = area.iter().find(|(_pos, value)| **value < 1).unwrap();
 
         for (poly_idx, poly) in polys.iter().enumerate() {
             // For every mino, attempt to place it at the selected square
@@ -886,7 +951,8 @@ impl Puzzle {
                 let nb_of_colors = colors.len();
 
                 if cell.is_null() {
-                    puzzle.outside_positions.insert(pos);
+                    // This is not reliable
+                    // puzzle.outside_positions.insert(pos);
                     continue;
                 }
 
@@ -943,12 +1009,38 @@ impl Puzzle {
                                 .or_insert(nb_of_colors as u8),
                         );
                     }
-                    _ => {}
+                    cell_type => println!("Unknown cell type: {cell_type}"),
                 };
             }
         }
 
         Ok(puzzle)
+    }
+
+    /// Return the content of the given cell
+    ///
+    /// Computationally expensive as it checks multiple hashmaps
+    pub fn get_cell_content(&self, pos: &Pos) -> CellType {
+        if let Some(cell) = self.squares.get(pos) {
+            return CellType::Square(*cell);
+        }
+        if let Some(cell) = self.stars.get(pos) {
+            return CellType::Star(*cell);
+        }
+        if let Some(cell) = self.triangles.get(pos) {
+            return CellType::Triangle(*cell);
+        }
+        if let Some(cell) = self.polys.get(pos) {
+            return CellType::Poly(cell.clone());
+        }
+        if let Some(cell) = self.ylops.get(pos) {
+            return CellType::Ylop(cell.clone());
+        }
+        if let Some(cell) = self.cancels.get(pos) {
+            return CellType::Canceller(*cell);
+        }
+
+        CellType::Empty
     }
 }
 

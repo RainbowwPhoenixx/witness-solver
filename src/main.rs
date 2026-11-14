@@ -2,6 +2,7 @@ use std::time::Instant;
 
 use crate::{puzzle::*, solver::BFSSolverConfig};
 
+mod display;
 mod puzzle;
 mod solver;
 
@@ -22,6 +23,8 @@ fn main() {
     let before = Instant::now();
     let solutions = solver.solve();
     let solve_time = before.elapsed();
+
+    println!("{}", puzzle.display_with_solution(solutions.first()));
 
     println!(
         "Found {} solutions and visited {} states in {:?}",
