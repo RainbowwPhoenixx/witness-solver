@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::{puzzle::*, solver::BFSSolverConfig};
+use crate::{puzzle::Puzzle, solver::BFSSolverConfig};
 
 mod display;
 mod puzzle;

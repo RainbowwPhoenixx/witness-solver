@@ -1,8 +1,6 @@
-#![allow(unused)]
-
 use std::{
     collections::{HashMap, HashSet},
-    fmt::{Display, Write},
+    fmt::Display,
     hash::Hash,
     ops::{Add, Deref, DerefMut, Sub},
 };
@@ -47,21 +45,20 @@ impl Pos {
     }
 
     #[inline(always)]
-    pub fn move_direction(&self, dir: Direction) -> Pos {
-        let mut res = *self;
+    pub fn move_direction(mut self, dir: Direction) -> Pos {
         match dir {
-            Direction::Up => res.y = res.y.wrapping_add(1),
-            Direction::Down => res.y = res.y.wrapping_sub(1),
-            Direction::Right => res.x = res.x.wrapping_add(1),
-            Direction::Left => res.x = res.x.wrapping_sub(1),
+            Direction::Up => self.y = self.y.wrapping_add(1),
+            Direction::Down => self.y = self.y.wrapping_sub(1),
+            Direction::Right => self.x = self.x.wrapping_add(1),
+            Direction::Left => self.x = self.x.wrapping_sub(1),
         }
-        res
+        self
     }
 
     /// Returns the 4 edges that surround the given cell, in this order:
     /// Up, Down, Right, Left
     #[inline(always)]
-    pub fn get_cell_edges(&self) -> [EdgePos; 4] {
+    pub fn get_cell_edges(self) -> [EdgePos; 4] {
         [
             self.get_cell_edge_in_direction(Direction::Up),
             self.get_cell_edge_in_direction(Direction::Down),
@@ -72,7 +69,7 @@ impl Pos {
 
     /// Returns the edge in the given direction
     #[inline(always)]
-    pub fn get_cell_edge_in_direction(&self, dir: Direction) -> EdgePos {
+    pub fn get_cell_edge_in_direction(self, dir: Direction) -> EdgePos {
         match dir {
             Direction::Up => EdgePos::new(self.x, self.y + 1, Direction::Right),
             Direction::Down => EdgePos::new(self.x, self.y, Direction::Right),
@@ -82,12 +79,12 @@ impl Pos {
     }
 
     #[inline(always)]
-    pub fn get_neighbours(&self) -> [Pos; 4] {
+    pub fn _get_neighbours(self) -> [Pos; 4] {
         todo!()
     }
 
     /// Returns the direction to go from self to other, if self and other are adjacent
-    pub fn get_direction_to(&self, other: &Self) -> Option<Direction> {
+    pub fn get_direction_to(self, other: Self) -> Option<Direction> {
         match (other.x.wrapping_sub(self.x), other.y.wrapping_sub(self.y)) {
             (0, 1) => Some(Direction::Up),
             (0, -1) => Some(Direction::Down),
@@ -129,7 +126,7 @@ impl Display for Direction {
 pub struct SolutionPath(Vec<Pos>);
 
 impl SolutionPath {
-    pub fn new(start: Pos, dirs: String) -> Result<Self, ()> {
+    pub fn new(start: Pos, dirs: &str) -> Result<Self, ()> {
         let mut res = vec![start];
         let mut prev = start;
 
@@ -153,8 +150,8 @@ impl SolutionPath {
     pub fn try_as_edge_path(&self) -> Result<Vec<EdgePos>, ()> {
         let mut path_edges = Vec::with_capacity(self.len() - 1);
         for window in self.windows(2) {
-            let dir = window[0].get_direction_to(&window[1]).ok_or(())?;
-            path_edges.push(EdgePos::new(window[0].x, window[0].y, dir))
+            let dir = window[0].get_direction_to(window[1]).ok_or(())?;
+            path_edges.push(EdgePos::new(window[0].x, window[0].y, dir));
         }
 
         Ok(path_edges)
@@ -170,21 +167,16 @@ impl From<Vec<Pos>> for SolutionPath {
 impl Display for SolutionPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_empty() {
-            write!(f, "Empty solution");
-            return Ok(());
+            return write!(f, "Empty solution");
         }
 
-        write!(f, "{} ", self[0]);
+        write!(f, "{} ", self[0])?;
 
         for win in self.windows(2) {
             let prev = win[0];
             let next = win[1];
 
-            write!(
-                f,
-                "{}",
-                prev.get_direction_to(&next).ok_or(std::fmt::Error)?
-            );
+            write!(f, "{}", prev.get_direction_to(next).ok_or(std::fmt::Error)?)?;
         }
 
         Ok(())
@@ -220,9 +212,8 @@ impl EdgePos {
     }
 
     /// Return the cells left and right of the edge.
-    pub fn get_neighbouring_cells(&self) -> (Pos, Pos) {
-        let x = self.pos.x;
-        let y = self.pos.y;
+    pub fn get_neighbouring_cells(self) -> (Pos, Pos) {
+        let Pos { x, y } = self.pos;
 
         match self.dir {
             Direction::Up => (Pos::new(x - 1, y), Pos::new(x, y)),
@@ -233,28 +224,27 @@ impl EdgePos {
     }
 
     /// Return the corners at the ends of edge
-    pub fn get_neighbouring_corners(&self) -> [Pos; 2] {
+    pub fn get_neighbouring_corners(self) -> [Pos; 2] {
         [self.pos, self.pos.move_direction(self.dir)]
     }
 
-    fn normalize(&self) -> Self {
-        let mut res = *self;
+    fn normalize(mut self) -> Self {
         match self.dir {
             Direction::Down => {
-                res.pos.y -= 1;
-                res.dir = Direction::Up
+                self.pos.y -= 1;
+                self.dir = Direction::Up;
             }
             Direction::Left => {
-                res.pos.x -= 1;
-                res.dir = Direction::Right
+                self.pos.x -= 1;
+                self.dir = Direction::Right;
             }
             Direction::Up | Direction::Right => {}
         }
-        res
+        self
     }
 
     #[inline(always)]
-    fn true_eq(self, other: &Self) -> bool {
+    fn true_eq(self, other: Self) -> bool {
         self.pos == other.pos && self.dir == other.dir
     }
 }
@@ -262,7 +252,7 @@ impl EdgePos {
 impl PartialEq for EdgePos {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
-        self.normalize().true_eq(&other.normalize())
+        self.normalize().true_eq(other.normalize())
     }
 }
 
@@ -288,10 +278,10 @@ impl From<u32> for Poly {
         let rotatable = (value & 1 << 20) != 0;
         let mut minos = vec![];
 
-        for x in 0..4 {
-            for y in 0..4 {
-                if (value & (1 << (x * 4 + 3 - y))) != 0 {
-                    minos.push(Pos::new(x as i8, y as i8))
+        for x in 0..4_i8 {
+            for y in 0..4_i8 {
+                if (value & (1 << (i32::from(x) * 4 + 3 - i32::from(y)))) != 0 {
+                    minos.push(Pos::new(x, y));
                 }
             }
         }
@@ -301,7 +291,7 @@ impl From<u32> for Poly {
 }
 
 impl Poly {
-    pub fn new(mut rotatable: bool, minos: Vec<Pos>) -> Self {
+    pub fn new(rotatable: bool, minos: Vec<Pos>) -> Self {
         let mut res = Self { rotatable, minos };
         // Set rotatable to false if mino has rotationnal symmetry
         res.normalize();
@@ -310,7 +300,7 @@ impl Poly {
             copy.rotate_clockwise();
 
             if copy == res {
-                res.rotatable = false
+                res.rotatable = false;
             }
         }
 
@@ -363,6 +353,10 @@ impl Poly {
             ymax = ymax.max(block.y);
         }
 
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "polys should always have positive coords anyway"
+        )]
         (
             (xmax.abs_diff(xmin) + 1) as i8,
             (ymax.abs_diff(ymin) + 1) as i8,
@@ -471,16 +465,16 @@ impl Default for Puzzle {
             height: 1,
             starts: vec![Pos { x: 0, y: 0 }],
             ends: vec![Pos { x: 1, y: 1 }],
-            blocked_edges: Default::default(),
-            outside_positions: Default::default(),
-            squares: Default::default(),
-            stars: Default::default(),
-            triangles: Default::default(),
-            polys: Default::default(),
-            ylops: Default::default(),
-            cancels: Default::default(),
-            vertex_stones: Default::default(),
-            edge_stones: Default::default(),
+            blocked_edges: HashSet::default(),
+            outside_positions: HashSet::default(),
+            squares: HashMap::default(),
+            stars: HashMap::default(),
+            triangles: HashMap::default(),
+            polys: HashMap::default(),
+            ylops: HashMap::default(),
+            cancels: HashMap::default(),
+            vertex_stones: HashSet::default(),
+            edge_stones: HashSet::default(),
         }
     }
 }
@@ -499,17 +493,17 @@ impl Puzzle {
 
     /// Check if the vertex is inside the puzzle
     #[inline(always)]
-    pub fn contains_vertex(&self, pos: &Pos) -> bool {
+    pub fn contains_vertex(&self, pos: Pos) -> bool {
         pos.x >= 0 && pos.x <= self.width && pos.y >= 0 && pos.y <= self.height
     }
 
     /// Check if the cell is inside the puzzle
     #[inline(always)]
-    pub fn contains_cell(&self, pos: &Pos) -> bool {
+    pub fn contains_cell(&self, pos: Pos) -> bool {
         // First a general bounds check
         if pos.x >= 0 && pos.x < self.width && pos.y >= 0 && pos.y < self.height {
             // Then check if the cell is still considered "oob" even if in the bounds
-            !self.outside_positions.contains(pos)
+            !self.outside_positions.contains(&pos)
         } else {
             false
         }
@@ -517,13 +511,13 @@ impl Puzzle {
 
     /// Check if the position is on the puzzle boundary
     #[inline(always)]
-    pub fn is_outer(&self, pos: &Pos) -> bool {
+    pub fn _is_outer(&self, pos: Pos) -> bool {
         pos.x == 0 || pos.x == self.width || pos.y == 0 || pos.y == self.height
     }
 
     /// Check if the given edge is broken
     #[inline(always)]
-    pub fn is_blocked(&self, edge: &EdgePos) -> bool {
+    pub fn is_blocked(&self, edge: EdgePos) -> bool {
         self.blocked_edges.contains(&edge)
     }
 
@@ -573,10 +567,14 @@ impl Puzzle {
     /// as many cancellers as early as possible.
     ///
     ///
-    /// TODO: maybe change the area to be a &Hashmap<Pos, CellType>, for a more optimized checking?
+    /// TODO: maybe change the area to be a &Hashmap<Pos, `CellType`>, for a more optimized checking?
     /// this would also allow recursing on the area instead of the whole ass puzzle, and avoid duplicate
     /// computation!
     /// it would make the actual checks a little clunkier though
+    #[expect(
+        clippy::too_many_lines,
+        reason = "should be rewritten soon in the big cleanup"
+    )]
     pub fn is_valid(&self, path: &SolutionPath, area: &Area) -> bool {
         let Ok(path_edges) = path.try_as_edge_path() else {
             return false;
@@ -623,7 +621,7 @@ impl Puzzle {
         }
 
         // Check triangles
-        for cell in area.cells.iter() {
+        for cell in &area.cells {
             match self.triangles.get(cell) {
                 Some(&count)
                     if count as usize
@@ -695,7 +693,7 @@ impl Puzzle {
 
         // Check squares
         let mut color: Option<Color> = None;
-        for cell in area.cells.iter() {
+        for cell in &area.cells {
             match self.squares.get(cell) {
                 Some(col) if color.get_or_insert(*col) != col => return false,
                 _ => {}
@@ -725,11 +723,7 @@ impl Puzzle {
             }
         }
 
-        if !self.check_tetris(&area.cells) {
-            return false;
-        }
-
-        true
+        self.check_tetris(&area.cells)
     }
 
     /// Return true if the area is valid according to the tetris rule
@@ -751,19 +745,24 @@ impl Puzzle {
         }
 
         let mut covering = HashMap::new();
-        for &pos in area.iter() {
+        for &pos in area {
             covering.insert(pos, 0);
         }
 
-        self.can_tile(polys, ylops, &covering)
+        self.can_tile(&polys, &ylops, &covering)
     }
 
     /// Try tiling the given polys and ylops in the given area
     /// This implementation is heavily inspired from jbdarkid's solver
     /// This is currently implemented using a perly recursive strategy
     /// TODO: switch to backtracking to improve memory footprint
+    /// TODO: dont ignore ylops
     /// TODO: try placing the bigger polys first
-    fn can_tile(&self, polys: Vec<&Poly>, ylops: Vec<&Poly>, area: &HashMap<Pos, i16>) -> bool {
+    #[expect(
+        clippy::self_only_used_in_recursion,
+        reason = "tiling code is undergoing a rewrite"
+    )]
+    fn can_tile(&self, polys: &Vec<&Poly>, ylops: &Vec<&Poly>, area: &HashMap<Pos, i16>) -> bool {
         // Insert stop condition(s) here
         if polys.is_empty() && ylops.is_empty() {
             return area.values().all(|&cover_count| cover_count == 1);
@@ -776,20 +775,20 @@ impl Puzzle {
             // For every mino, attempt to place it at the selected square
             for rotation in &poly.get_rotations() {
                 // For every rotation state of the poly
-                for center_mino in rotation.minos.iter() {
+                for center_mino in &rotation.minos {
                     // Recurse if mino is fully contained within the area and
                     // only covers squares with 0 or less minos on it
                     if rotation.minos.iter().all(|mino|
                         matches!(area.get(&(*square.0 + *mino - *center_mino)), Some(&cover_count) if cover_count < 1)
                     ) {
                         let mut new_area = area.clone();
-                        for mino in rotation.minos.iter() {
+                        for mino in &rotation.minos {
                             // TODO: increase cover count instead
                             new_area.remove(&(*square.0 + *mino - *center_mino));
                         }
                         let mut new_polys = polys.clone();
                         new_polys.swap_remove(poly_idx);
-                        if self.can_tile(new_polys, ylops.clone(), &new_area) {
+                        if self.can_tile(&new_polys, ylops, &new_area) {
                             return true;
                         }
                     }
@@ -835,7 +834,7 @@ impl Puzzle {
 
         // Return immediately if cell is outside of the puzzle or
         // if the cell was already in the area
-        if !self.contains_cell(&pos) || !area_cells.insert(pos) {
+        if !self.contains_cell(pos) || !area_cells.insert(pos) {
             return;
         }
 
@@ -871,25 +870,23 @@ impl Puzzle {
     /// TODO: Implement ends/starts on edges. They are equivalent
     /// to two end/start on each end of the edge, and a blocked
     /// edge separating them
+    #[expect(
+        clippy::too_many_lines,
+        reason = "This function is a bit too long but is never expected to change"
+    )]
     pub fn from_json(src: &str) -> Result<Self, String> {
         let data = json::parse(src).unwrap();
 
         let width = data["width"]
-            .as_usize()
+            .as_i8()
             .ok_or("Failed to decode puzzle width")?
             / 2;
         let height = data["height"]
-            .as_usize()
+            .as_i8()
             .ok_or("Failed to decode puzzle height")?
             / 2;
 
-        let mut puzzle = Puzzle {
-            width: width as i8,
-            height: height as i8,
-            starts: vec![],
-            ends: vec![],
-            ..Default::default()
-        };
+        let mut puzzle = Puzzle::default_with_size(width, height);
 
         // To read the grid, we need to do some coordinate manipulations
         // because of the format
@@ -897,17 +894,17 @@ impl Puzzle {
         // Process corners (starts, ends, stones)
         for x in 0..=width {
             for y in 0..=height {
-                let cell = &data["grid"][x * 2][(height - y) * 2];
+                let cell = &data["grid"][x as usize * 2][(height as usize - y as usize) * 2];
                 if cell["start"] == true {
-                    puzzle.starts.push(Pos::new(x as i8, y as i8));
+                    puzzle.starts.push(Pos::new(x, y));
                 }
 
                 if cell["end"].is_string() {
-                    puzzle.ends.push(Pos::new(x as i8, y as i8));
+                    puzzle.ends.push(Pos::new(x, y));
                 }
 
                 if cell["dot"].is_number() {
-                    puzzle.vertex_stones.insert(Pos::new(x as i8, y as i8));
+                    puzzle.vertex_stones.insert(Pos::new(x, y));
                 }
             }
         }
@@ -915,28 +912,26 @@ impl Puzzle {
         // Process edges (stone, broken edge)
         for x in 0..=width {
             for y in 0..=height {
-                let up = &data["grid"][x * 2][(height - y) * 2 - 1];
-                let right = &data["grid"][x * 2 + 1][(height - y) * 2];
+                let up = &data["grid"][x as usize * 2][(height as usize - y as usize) * 2 - 1];
+                let right = &data["grid"][x as usize * 2 + 1][(height as usize - y as usize) * 2];
 
                 if up["dot"].is_number() {
-                    puzzle
-                        .edge_stones
-                        .insert(EdgePos::new(x as i8, y as i8, Direction::Up));
+                    puzzle.edge_stones.insert(EdgePos::new(x, y, Direction::Up));
                 }
                 if right["dot"].is_number() {
                     puzzle
                         .edge_stones
-                        .insert(EdgePos::new(x as i8, y as i8, Direction::Right));
+                        .insert(EdgePos::new(x, y, Direction::Right));
                 }
                 if up["gap"].is_number() {
                     puzzle
                         .blocked_edges
-                        .insert(EdgePos::new(x as i8, y as i8, Direction::Up));
+                        .insert(EdgePos::new(x, y, Direction::Up));
                 }
                 if right["gap"].is_number() {
                     puzzle
                         .blocked_edges
-                        .insert(EdgePos::new(x as i8, y as i8, Direction::Right));
+                        .insert(EdgePos::new(x, y, Direction::Right));
                 }
             }
         }
@@ -946,9 +941,10 @@ impl Puzzle {
         // Process cells
         for x in 0..width {
             for y in 0..height {
-                let cell = &data["grid"][x * 2 + 1][(height - y) * 2 - 1];
-                let pos = Pos::new(x as i8, y as i8);
-                let nb_of_colors = colors.len();
+                let cell =
+                    &data["grid"][x as usize * 2 + 1][(height as usize - y as usize) * 2 - 1];
+                let pos = Pos::new(x, y);
+                let nb_of_colors: u8 = colors.len().try_into().map_err(|e| format!("Too many colors {e}"))?;
 
                 if cell.is_null() {
                     // This is not reliable
@@ -970,7 +966,7 @@ impl Puzzle {
                             pos,
                             *colors
                                 .entry(cell["color"].as_str().ok_or("Failed to decode color")?)
-                                .or_insert(nb_of_colors as u8),
+                                .or_insert(nb_of_colors),
                         );
                     }
                     "star" => {
@@ -978,7 +974,7 @@ impl Puzzle {
                             pos,
                             *colors
                                 .entry(cell["color"].as_str().ok_or("Failed to decode color")?)
-                                .or_insert(nb_of_colors as u8),
+                                .or_insert(nb_of_colors),
                         );
                     }
                     "poly" => {
@@ -1006,11 +1002,11 @@ impl Puzzle {
                             pos,
                             *colors
                                 .entry(cell["color"].as_str().ok_or("Failed to decode color")?)
-                                .or_insert(nb_of_colors as u8),
+                                .or_insert(nb_of_colors),
                         );
                     }
                     cell_type => println!("Unknown cell type: {cell_type}"),
-                };
+                }
             }
         }
 
@@ -1020,23 +1016,23 @@ impl Puzzle {
     /// Return the content of the given cell
     ///
     /// Computationally expensive as it checks multiple hashmaps
-    pub fn get_cell_content(&self, pos: &Pos) -> CellType {
-        if let Some(cell) = self.squares.get(pos) {
+    pub fn get_cell_content(&self, pos: Pos) -> CellType {
+        if let Some(cell) = self.squares.get(&pos) {
             return CellType::Square(*cell);
         }
-        if let Some(cell) = self.stars.get(pos) {
+        if let Some(cell) = self.stars.get(&pos) {
             return CellType::Star(*cell);
         }
-        if let Some(cell) = self.triangles.get(pos) {
+        if let Some(cell) = self.triangles.get(&pos) {
             return CellType::Triangle(*cell);
         }
-        if let Some(cell) = self.polys.get(pos) {
+        if let Some(cell) = self.polys.get(&pos) {
             return CellType::Poly(cell.clone());
         }
-        if let Some(cell) = self.ylops.get(pos) {
+        if let Some(cell) = self.ylops.get(&pos) {
             return CellType::Ylop(cell.clone());
         }
-        if let Some(cell) = self.cancels.get(pos) {
+        if let Some(cell) = self.cancels.get(&pos) {
             return CellType::Canceller(*cell);
         }
 
@@ -1054,21 +1050,21 @@ mod tests {
 
     #[test]
     fn test_edge_true_eq() {
-        assert!(UP_EDGE.true_eq(&UP_EDGE));
-        assert!(!UP_EDGE.true_eq(&DOWN_EDGE));
+        assert!(UP_EDGE.true_eq(UP_EDGE));
+        assert!(!UP_EDGE.true_eq(DOWN_EDGE));
     }
 
     #[test]
     fn test_edge_eq() {
-        assert!(UP_EDGE == UP_EDGE);
-        assert!(UP_EDGE == DOWN_EDGE);
-        assert!(RIGHT_EDGE == LEFT_EDGE);
+        assert_eq!(UP_EDGE, UP_EDGE);
+        assert_eq!(UP_EDGE, DOWN_EDGE);
+        assert_eq!(RIGHT_EDGE, LEFT_EDGE);
     }
 
     #[test]
     fn test_edge_normalise() {
-        assert!(DOWN_EDGE.normalize().true_eq(&UP_EDGE));
-        assert!(LEFT_EDGE.normalize().true_eq(&RIGHT_EDGE));
+        assert!(DOWN_EDGE.normalize().true_eq(UP_EDGE));
+        assert!(LEFT_EDGE.normalize().true_eq(RIGHT_EDGE));
     }
 
     #[test]
@@ -1078,10 +1074,10 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(puzzle.is_blocked(&UP_EDGE));
-        assert!(puzzle.is_blocked(&DOWN_EDGE));
-        assert!(!puzzle.is_blocked(&RIGHT_EDGE));
-        assert!(!puzzle.is_blocked(&LEFT_EDGE));
+        assert!(puzzle.is_blocked(UP_EDGE));
+        assert!(puzzle.is_blocked(DOWN_EDGE));
+        assert!(!puzzle.is_blocked(RIGHT_EDGE));
+        assert!(!puzzle.is_blocked(LEFT_EDGE));
     }
 
     #[test]
@@ -1091,14 +1087,14 @@ mod tests {
         let pos3 = Pos::new(1, 0);
         let pos4 = Pos::new(1, 1);
 
-        assert!(pos1.get_direction_to(&pos2) == Some(Direction::Up));
-        assert!(pos2.get_direction_to(&pos1) == Some(Direction::Down));
-        assert!(pos1.get_direction_to(&pos3) == Some(Direction::Right));
-        assert!(pos3.get_direction_to(&pos1) == Some(Direction::Left));
-        assert!(pos1.get_direction_to(&pos4).is_none());
-        assert!(pos4.get_direction_to(&pos1).is_none());
-        assert!(pos2.get_direction_to(&pos3).is_none());
-        assert!(pos3.get_direction_to(&pos2).is_none());
+        assert_eq!(pos1.get_direction_to(pos2), Some(Direction::Up));
+        assert_eq!(pos2.get_direction_to(pos1), Some(Direction::Down));
+        assert_eq!(pos1.get_direction_to(pos3), Some(Direction::Right));
+        assert_eq!(pos3.get_direction_to(pos1), Some(Direction::Left));
+        assert!(pos1.get_direction_to(pos4).is_none());
+        assert!(pos4.get_direction_to(pos1).is_none());
+        assert!(pos2.get_direction_to(pos3).is_none());
+        assert!(pos3.get_direction_to(pos2).is_none());
     }
 
     #[test]
@@ -1114,7 +1110,7 @@ mod tests {
             squares: [(Pos::new(0, 0), 0), (Pos::new(1, 0), 1)].into(),
             ..Default::default()
         };
-        let solution = SolutionPath::new(Pos::new(1, 0), "U".into()).unwrap();
+        let solution = SolutionPath::new(Pos::new(1, 0), "U").unwrap();
 
         assert!(puzzle.is_solution(&solution));
     }
@@ -1132,8 +1128,8 @@ mod tests {
             ..Default::default()
         };
         let solutions = [
-            SolutionPath::new(Pos::new(1, 0), "LUR".into()).unwrap(),
-            SolutionPath::new(Pos::new(1, 0), "RUL".into()).unwrap(),
+            SolutionPath::new(Pos::new(1, 0), "LUR").unwrap(),
+            SolutionPath::new(Pos::new(1, 0), "RUL").unwrap(),
         ];
 
         for sol in solutions {
@@ -1156,8 +1152,7 @@ mod tests {
             ..Puzzle::default_with_size(4, 4)
         };
 
-        let solution =
-            SolutionPath::new(Pos::new(0, 0), "UURULURRRDLDDLDRRRULURUU".into()).unwrap();
+        let solution = SolutionPath::new(Pos::new(0, 0), "UURULURRRDLDDLDRRRULURUU").unwrap();
         assert!(puzzle.is_solution(&solution));
     }
 }

@@ -14,3 +14,10 @@ overflow-checks = false
 
 [profile.test]
 overflow-checks = false
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+
+inline_always = "allow"
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"

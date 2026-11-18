@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use colored::Colorize as _;
+use std::fmt::Write as _;
 
-use crate::puzzle::*;
+use crate::puzzle::{CellType, Direction, EdgePos, Poly, Pos, Puzzle, SolutionPath};
 
 const DR: &str = "┌";
 const DL: &str = "┐";
@@ -41,7 +42,7 @@ impl Poly {
         // Create bitmap
         let mut bitmap = [[false; Self::MAX_INLINE_WIDTH]; Self::MAX_INLINE_HEIGHT];
         for block in disp_poly.minos() {
-            bitmap[block.y as usize][block.x as usize] = true
+            bitmap[block.y as usize][block.x as usize] = true;
         }
 
         // Center bitmap so it looks not stupid
@@ -110,7 +111,7 @@ impl Poly {
                     map_on_color("  ", ORANGE_ID)
                 } else {
                     "  ".into()
-                })
+                });
             }
             res.push('\n');
         }
@@ -127,7 +128,7 @@ impl Puzzle {
         res.push_str(&color_vertex(
             self,
             solution,
-            &Pos::new(0, y),
+            Pos::new(0, y),
             match y {
                 0 => UR,                               // Bottom left corner
                 height if height == self.height => DR, // Left side
@@ -140,7 +141,7 @@ impl Puzzle {
                 res.push_str(&color_vertex(
                     self,
                     solution,
-                    &Pos::new(x, y),
+                    Pos::new(x, y),
                     match y {
                         0 => ULR,                               // Bottom vertex
                         height if height == self.height => DLR, // Middle vertex
@@ -150,18 +151,18 @@ impl Puzzle {
             }
 
             let edge = EdgePos::new(x, y, Direction::Right);
-            if self.is_blocked(&edge) {
+            if self.is_blocked(edge) {
                 res.push_str(BROKEN_LR);
             } else {
                 // Color edge red if it has a stone
-                res.push_str(&color_edge(self, solution, &edge, LR));
+                res.push_str(&color_edge(self, solution, edge, LR));
             }
         }
         // Last column
         res.push_str(&color_vertex(
             self,
             solution,
-            &Pos::new(self.width, y),
+            Pos::new(self.width, y),
             match y {
                 0 => UL,                               // Bottom right corner
                 height if height == self.height => DL, // Right side
@@ -186,20 +187,20 @@ impl Puzzle {
         for y in (0..self.height).rev() {
             for x in 0..self.width {
                 let edge = EdgePos::new(x, y, Direction::Up);
-                if self.is_blocked(&edge) {
+                if self.is_blocked(edge) {
                     res.push_str(BROKEN_UD);
                 } else {
-                    res.push_str(&color_edge(self, solution, &edge, UD));
+                    res.push_str(&color_edge(self, solution, edge, UD));
                 }
 
-                match self.get_cell_content(&Pos::new(x, y)) {
+                match self.get_cell_content(Pos::new(x, y)) {
                     CellType::Empty => res.push_str("   "),
                     CellType::Square(c) => res.push_str(&map_color(" ■ ", c)),
                     CellType::Star(c) => res.push_str(&map_color(" ✹ ", c)),
                     CellType::Triangle(n) => res.push_str(&map_color(&format!(" {n} "), ORANGE_ID)),
                     CellType::Poly(p) => {
                         if p.can_display_inline() {
-                            res.push_str(&p.display_inline(true))
+                            res.push_str(&p.display_inline(true));
                         } else {
                             let legend = polyomino_legend.entry(p.clone()).or_insert_with(|| {
                                 let legend = String::from_utf8_lossy_owned(vec![current_legend]);
@@ -207,7 +208,7 @@ impl Puzzle {
                                 legend
                             });
 
-                            res.push_str(&format!(" {legend} "));
+                            let _ = write!(res, " {legend} ");
                         }
                     }
                     CellType::Ylop(p) => {
@@ -216,7 +217,7 @@ impl Puzzle {
                                 &p.display_inline(true)
                                     .on_color(colored::Color::BrightCyan)
                                     .to_string(),
-                            )
+                            );
                         } else {
                             let legend = polyomino_legend
                                 .entry(p.clone())
@@ -229,7 +230,7 @@ impl Puzzle {
                                 .on_color(colored::Color::BrightCyan)
                                 .to_string();
 
-                            res.push_str(&format!(" {legend} "));
+                            let _ = write!(res, " {legend} ");
                         }
                     }
                     CellType::Canceller(c) => res.push_str(&map_color(" 🟀 ", c)),
@@ -237,10 +238,10 @@ impl Puzzle {
             }
 
             let edge = EdgePos::new(self.width, y, Direction::Up);
-            if self.is_blocked(&edge) {
+            if self.is_blocked(edge) {
                 res.push_str(BROKEN_UD);
             } else {
-                res.push_str(&color_edge(self, solution, &edge, UD));
+                res.push_str(&color_edge(self, solution, edge, UD));
             }
 
             res.push('\n');
@@ -250,13 +251,9 @@ impl Puzzle {
 
         // Generate legend for too-large polys
         for (poly, legend) in polyomino_legend {
-            let rotatable = if poly.rotatable() {
-                "rotatable"
-            } else {
-                ""
-            };
+            let rotatable = if poly.rotatable() { "rotatable" } else { "" };
 
-            res.push_str(&format!("{}: {}\n", legend, rotatable));
+            let _ = writeln!(res, "{legend}: {rotatable}");
             res.push_str(&poly.display_legend());
         }
 
@@ -310,36 +307,36 @@ fn map_on_color(s: &str, color_id: u8) -> String {
     res.to_string()
 }
 
-fn color_edge(p: &Puzzle, solution: Option<&SolutionPath>, edge: &EdgePos, s: &str) -> String {
+fn color_edge(p: &Puzzle, solution: Option<&SolutionPath>, edge: EdgePos, s: &str) -> String {
     let bg = if let Some(sol) = solution
-        && sol.try_as_edge_path().unwrap().contains(edge)
+        && sol.try_as_edge_path().unwrap().contains(&edge)
     {
         s.on_color(SOLUTION_COLOR).to_string()
     } else {
         s.to_string()
     };
 
-    if p.edge_stones.contains(edge) {
+    if p.edge_stones.contains(&edge) {
         bg.color(STONE_COLOR).to_string()
     } else {
         bg
     }
 }
 
-fn color_vertex(p: &Puzzle, solution: Option<&SolutionPath>, pos: &Pos, s: &str) -> String {
-    let bg = if p.starts.contains(pos) {
+fn color_vertex(p: &Puzzle, solution: Option<&SolutionPath>, pos: Pos, s: &str) -> String {
+    let bg = if p.starts.contains(&pos) {
         s.on_color(START_COLOR).to_string()
-    } else if p.ends.contains(pos) {
+    } else if p.ends.contains(&pos) {
         s.on_color(END_COLOR).to_string()
     } else if let Some(sol) = solution
-        && sol.contains(pos)
+        && sol.contains(&pos)
     {
         s.on_color(SOLUTION_COLOR).to_string()
     } else {
         s.to_string()
     };
 
-    if p.vertex_stones.contains(pos) {
+    if p.vertex_stones.contains(&pos) {
         bg.color(STONE_COLOR).to_string()
     } else {
         bg

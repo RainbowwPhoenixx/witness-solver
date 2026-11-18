@@ -1,8 +1,6 @@
-#![allow(unused)]
-
 use std::collections::{HashSet, VecDeque};
 
-use crate::puzzle::*;
+use crate::puzzle::{Color, Direction, EdgePos, Pos, Puzzle, SolutionPath};
 
 #[derive(Clone)]
 pub struct PartialSolution {
@@ -13,13 +11,13 @@ pub struct PartialSolution {
     // /// Completed areas that have already been checked and are correct
     // full_areas: Vec<HashSet<Pos>>,
     // /// Cancels that are not yet taken by partial or full areas
-    // cancels_left: u8,
+    // cancels_left: usize,
     /// Number of reachable ends left
-    reachable_ends: u8,
+    reachable_ends: usize,
 }
 
 impl PartialSolution {
-    pub fn new(start: Pos, cancels: u8, ends: u8) -> Self {
+    pub fn new(start: Pos, _cancels: usize, ends: usize) -> Self {
         Self {
             path: vec![start].into(),
             partial_area_left: HashSet::new(),
@@ -31,6 +29,10 @@ impl PartialSolution {
     }
 }
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "the struct is not used for a state machine, but for configuration"
+)]
 pub struct BFSSolverConfig {
     pub simple_end_reachability_check: bool,
     pub edge_stones: bool,
@@ -73,7 +75,7 @@ impl BFSSolver {
             queue: VecDeque::new(),
             solutions: vec![],
             states_visited: 0,
-            config: Default::default(),
+            config: BFSSolverConfig::default(),
         }
     }
 
@@ -83,12 +85,12 @@ impl BFSSolver {
         }
 
         // Init the search with the start nodes
-        for &start in self.puzzle.starts.iter() {
+        for &start in &self.puzzle.starts {
             self.queue.push_back(PartialSolution::new(
                 start,
-                self.puzzle.cancels.len() as u8,
-                self.puzzle.ends.len() as u8,
-            ))
+                self.puzzle.cancels.len(),
+                self.puzzle.ends.len(),
+            ));
         }
 
         // So long as there are states to be visited, keep processing them
@@ -98,7 +100,7 @@ impl BFSSolver {
                 return self.solutions.clone();
             }
             let partial_sol = self.queue.pop_front().unwrap();
-            self.process_partial_solution(partial_sol);
+            self.process_partial_solution(&partial_sol);
             self.states_visited += 1;
 
             if self.config.max_solutions > 0
@@ -111,7 +113,7 @@ impl BFSSolver {
         self.solutions.clone()
     }
 
-    fn process_partial_solution(&mut self, sol: PartialSolution) {
+    fn process_partial_solution(&mut self, sol: &PartialSolution) {
         let pos = sol.path.last().unwrap();
 
         for dir in Direction::VARIANTS {
@@ -123,12 +125,12 @@ impl BFSSolver {
             // - Check that the target vertex is not already part of the path
             //   (in reverse because we are more likely to hit edges that closer
             //   to the end of the candidate solution)
-            if !self.puzzle.contains_vertex(&next)
-                || self.puzzle.is_blocked(&EdgePos { pos: *pos, dir })
+            if !self.puzzle.contains_vertex(next)
+                || self.puzzle.is_blocked(EdgePos { pos: *pos, dir })
                 || sol.path.iter().rev().any(|p| p == &next)
             {
                 continue;
-            };
+            }
 
             let mut new_sol = sol.clone();
             new_sol.path.push(next);
@@ -145,7 +147,7 @@ impl BFSSolver {
             // Check if we enclosed an area
             if self.config.closed_area_check
                 && sol.path.len() > 2
-                && (!self.puzzle.contains_cell(&left) || !self.puzzle.contains_cell(&right))
+                && (!self.puzzle.contains_cell(left) || !self.puzzle.contains_cell(right))
             {
                 todo!("Enclosed area checking is not yet implemented")
             }
@@ -157,11 +159,11 @@ impl BFSSolver {
                 new_sol.partial_area_right.insert(right);
 
                 // If left is outside, we are going along an edge and need to clear that area
-                if !self.puzzle.contains_cell(&left) {
+                if !self.puzzle.contains_cell(left) {
                     new_sol.partial_area_left.clear();
                 }
                 // Same with right
-                if !self.puzzle.contains_cell(&right) {
+                if !self.puzzle.contains_cell(right) {
                     new_sol.partial_area_right.clear();
                 }
 
@@ -197,7 +199,7 @@ impl BFSSolver {
     fn area_invalid(&self, area: &HashSet<Pos>) -> bool {
         // Check squares
         let mut color: Option<Color> = None;
-        for cell in area.iter() {
+        for cell in area {
             match self.puzzle.squares.get(cell) {
                 Some(col) if color.get_or_insert(*col) != col => return true,
                 _ => {}
@@ -223,7 +225,7 @@ impl BFSSolver {
                 && pos.move_direction(dir) != *sol.path.get(sol.path.len() - 3).unwrap_or(&pos)
             {
                 return true;
-            };
+            }
         }
         false
     }
@@ -241,17 +243,15 @@ impl Iterator for BFSSolver {
 mod bfs_tests {
     use super::*;
     use crate::puzzle::*;
-    use std::collections::{HashMap, HashSet};
 
-    fn test_solutions(puzzle: &Puzzle, expected_solutions: Vec<SolutionPath>) {
+    fn test_solutions(puzzle: &Puzzle, expected_solutions: &Vec<SolutionPath>) {
         let mut solver = BFSSolver::new(puzzle);
         let solutions = solver.solve();
 
         assert_eq!(
-            solutions, expected_solutions,
-            "Expected: {:?}\nGot: {:?}",
-            expected_solutions, solutions
-        )
+            &solutions, expected_solutions,
+            "Expected: {expected_solutions:?}\nGot: {solutions:?}"
+        );
     }
 
     fn test_solution_count(puzzle: &Puzzle, expected_count: usize) {
@@ -264,18 +264,18 @@ mod bfs_tests {
             "Expected: {:?}\nGot: {:?}",
             expected_count,
             solutions.len()
-        )
+        );
     }
 
     #[test]
     fn test_1x1() {
         let puzzle = Puzzle::default();
         let solutions = vec![
-            SolutionPath::new(Pos::new(0, 0), "UR".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "RU".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "UR").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RU").unwrap(),
         ];
 
-        test_solutions(&puzzle, solutions);
+        test_solutions(&puzzle, &solutions);
     }
 
     #[test]
@@ -284,9 +284,9 @@ mod bfs_tests {
             blocked_edges: [EdgePos::new(0, 0, Direction::Up)].into(),
             ..Default::default()
         };
-        let solutions = vec![SolutionPath::new(Pos::new(0, 0), "RU".into()).unwrap()];
+        let solutions = vec![SolutionPath::new(Pos::new(0, 0), "RU").unwrap()];
 
-        test_solutions(&puzzle, solutions);
+        test_solutions(&puzzle, &solutions);
     }
 
     #[test]
@@ -296,13 +296,13 @@ mod bfs_tests {
             ..Default::default()
         };
         let solutions = vec![
-            SolutionPath::new(Pos::new(0, 1), "R".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "UR".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "RU".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 1), "DRU".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 1), "R").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "UR").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RU").unwrap(),
+            SolutionPath::new(Pos::new(0, 1), "DRU").unwrap(),
         ];
 
-        test_solutions(&puzzle, solutions);
+        test_solutions(&puzzle, &solutions);
     }
 
     #[test]
@@ -312,13 +312,13 @@ mod bfs_tests {
             ..Default::default()
         };
         let solutions = vec![
-            SolutionPath::new(Pos::new(0, 0), "U".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "UR".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "RU".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "RUL".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "U").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "UR").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RU").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RUL").unwrap(),
         ];
 
-        test_solutions(&puzzle, solutions);
+        test_solutions(&puzzle, &solutions);
     }
 
     #[test]
@@ -328,9 +328,9 @@ mod bfs_tests {
             edge_stones: [EdgePos::new(0, 0, Direction::Right)].into(),
             ..Default::default()
         };
-        let solutions = vec![SolutionPath::new(Pos::new(0, 0), "RU".into()).unwrap()];
+        let solutions = vec![SolutionPath::new(Pos::new(0, 0), "RU").unwrap()];
 
-        test_solutions(&puzzle, solutions);
+        test_solutions(&puzzle, &solutions);
     }
 
     #[test]
@@ -346,9 +346,9 @@ mod bfs_tests {
             squares: [(Pos::new(0, 0), 0), (Pos::new(1, 0), 1)].into(),
             ..Default::default()
         };
-        let solutions = vec![SolutionPath::new(Pos::new(1, 0), "U".into()).unwrap()];
+        let solutions = vec![SolutionPath::new(Pos::new(1, 0), "U").unwrap()];
 
-        test_solutions(&puzzle, solutions);
+        test_solutions(&puzzle, &solutions);
     }
 
     #[test]
@@ -364,11 +364,11 @@ mod bfs_tests {
             ..Default::default()
         };
         let solutions = vec![
-            SolutionPath::new(Pos::new(1, 0), "RUL".into()).unwrap(),
-            SolutionPath::new(Pos::new(1, 0), "LUR".into()).unwrap(),
+            SolutionPath::new(Pos::new(1, 0), "RUL").unwrap(),
+            SolutionPath::new(Pos::new(1, 0), "LUR").unwrap(),
         ];
 
-        test_solutions(&puzzle, solutions);
+        test_solutions(&puzzle, &solutions);
     }
 
     #[test]
@@ -396,13 +396,13 @@ mod bfs_tests {
             ..Puzzle::default_with_size(4, 4)
         };
         let solutions = vec![
-            SolutionPath::new(Pos::new(0, 0), "RRRRULLLURRULURR".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "UUURRRDLLDRRDRUUUU".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "RRRRUULULDDLUUURRR".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "RRRRULLLURRULLURRR".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RRRRULLLURRULURR").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "UUURRRDLLDRRDRUUUU").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RRRRUULULDDLUUURRR").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RRRRULLLURRULLURRR").unwrap(),
         ];
 
-        test_solutions(&puzzle, solutions);
+        test_solutions(&puzzle, &solutions);
     }
 
     #[test]
@@ -420,8 +420,8 @@ mod bfs_tests {
             ..Puzzle::default_with_size(4, 4)
         };
         let solution =
-            SolutionPath::new(Pos::new(0, 0), "UURULURRRDLDDLDRRRULURUU".into()).unwrap();
-        test_solutions(&puzzle, vec![solution]);
+            SolutionPath::new(Pos::new(0, 0), "UURULURRRDLDDLDRRRULURUU").unwrap();
+        test_solutions(&puzzle, &vec![solution]);
     }
 
     #[test]
@@ -435,13 +435,13 @@ mod bfs_tests {
             ..Puzzle::default_with_size(3, 1)
         };
         let solutions = vec![
-            SolutionPath::new(Pos::new(0, 0), "RURR".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "RRUR".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "URDRRU".into()).unwrap(),
-            SolutionPath::new(Pos::new(0, 0), "URRDRU".into()).unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RURR").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "RRUR").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "URDRRU").unwrap(),
+            SolutionPath::new(Pos::new(0, 0), "URRDRU").unwrap(),
         ];
 
-        test_solutions(&puzzle, solutions)
+        test_solutions(&puzzle, &solutions);
     }
 
     #[test]
@@ -467,7 +467,7 @@ mod bfs_tests {
             ..Puzzle::default_with_size(3, 3)
         };
 
-        test_solution_count(&puzzle, 17)
+        test_solution_count(&puzzle, 17);
     }
 
     #[test]
@@ -501,7 +501,7 @@ mod bfs_tests {
             ..Puzzle::default_with_size(4, 1)
         };
 
-        test_solution_count(&puzzle, 8)
+        test_solution_count(&puzzle, 8);
     }
 
     #[test]
@@ -513,6 +513,6 @@ mod bfs_tests {
             ..Puzzle::default_with_size(4, 4)
         };
 
-        test_solution_count(&puzzle, 3678)
+        test_solution_count(&puzzle, 3678);
     }
 }
