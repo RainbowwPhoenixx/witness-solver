@@ -9,6 +9,13 @@ edition = "2024"
 colored = "3.1.1"
 json = "0.12.4"
 
+[dev-dependencies]
+benchkit = { version = "0.8.0", features = ["full"]}
+
+[profile.release]
+overflow-checks = false
+debug = 1
+
 [profile.dev]
 overflow-checks = false
 
