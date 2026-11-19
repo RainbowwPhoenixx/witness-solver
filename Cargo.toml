@@ -19,5 +19,6 @@ overflow-checks = false
 pedantic = { level = "warn", priority = -1 }
 
 inline_always = "allow"
+unreadable_literal = "allow"
 allow_attributes = "warn"
 allow_attributes_without_reason = "warn"
